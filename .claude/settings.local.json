@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npx sv *)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/pip freeze *)",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\('OK'\\)\")",
+      "Bash(npm install *)",
+      "Bash(.venv/bin/python -c \"from fastapi.responses import RedirectResponse; from fastapi.staticfiles import StaticFiles; print\\('OK'\\)\")",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)"
+    ]
+  }
+}
