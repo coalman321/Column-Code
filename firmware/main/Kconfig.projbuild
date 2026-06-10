@@ -70,34 +70,20 @@ menu "Column Firmware Configuration"
         range 1 3600
         help
             How often the device polls /colors/{mac} from the server and
-            applies the result to the LEDC PWM outputs.
+            drives the SK6812 LEDs with the result.
 
-    config COLOR_GPIO_R
-        int "GPIO for Red channel (LEDC)"
+    config COLOR_GPIO_DATA
+        int "GPIO for SK6812 data line"
         default 4
         range 0 30
         help
-            GPIO pin connected to the Red LED channel.
+            GPIO pin connected to the DIN pin of the first SK6812 LED.
 
-    config COLOR_GPIO_G
-        int "GPIO for Green channel (LEDC)"
-        default 5
-        range 0 30
+    config COLOR_NUM_LEDS
+        int "Number of SK6812 LEDs"
+        default 4
+        range 1 256
         help
-            GPIO pin connected to the Green LED channel.
-
-    config COLOR_GPIO_B
-        int "GPIO for Blue channel (LEDC)"
-        default 6
-        range 0 30
-        help
-            GPIO pin connected to the Blue LED channel.
-
-    config COLOR_GPIO_W
-        int "GPIO for White channel (LEDC)"
-        default 7
-        range 0 30
-        help
-            GPIO pin connected to the White LED channel.
+            Number of SK6812 RGBW LEDs in the chain.
 
 endmenu

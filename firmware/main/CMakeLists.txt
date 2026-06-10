@@ -9,7 +9,7 @@ idf_component_register(
         esp_netif
         esp_timer
         driver
-        esp_driver_ledc
+        esp_driver_rmt
         app_update
         esp_https_ota
         json
