@@ -1,0 +1,50 @@
+menu "Column Firmware Configuration"
+
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID of the WiFi network to connect to.
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            Password for the WiFi network.
+
+    config SERVER_BASE_URL
+        string "HTTP Server Base URL"
+        default "http://192.168.1.1:8000"
+        help
+            Base URL of the HTTP server (e.g. http://192.168.1.100:8000).
+
+    config HTTP_POLL_INTERVAL_MS
+        int "HTTP poll interval (ms)"
+        default 5000
+        range 1000 60000
+        help
+            How often to send an HTTP request to the server, in milliseconds.
+
+    config SERVER_TIMEOUT_MINUTES
+        int "Server unreachable timeout (minutes)"
+        default 10
+        range 1 60
+        help
+            How long to keep retrying the server before entering light sleep.
+
+    config WAKEUP_GPIO_PIN
+        int "Wakeup GPIO pin"
+        default 9
+        range 0 30
+        help
+            GPIO pin that wakes the device from light sleep. Pin 9 is the BOOT
+            button on most ESP32-C6 devkits.
+
+    config WAKEUP_GPIO_ACTIVE_LOW
+        bool "Wakeup GPIO is active low"
+        default y
+        help
+            Enable if the wakeup pin is pulled high and driven low to trigger
+            (e.g. a button to GND with internal pull-up). Disable for active high.
+
+endmenu
