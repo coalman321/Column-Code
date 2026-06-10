@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -8,8 +10,21 @@ from app.clients import router as clients_router
 from app.colors import router as colors_router
 from app.firmware import router as firmware_router
 from app.logs import router as logs_router
+import app.mqtt as mqtt_manager
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(mqtt_manager.run())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(clients_router)
 app.include_router(colors_router)
 app.include_router(firmware_router)

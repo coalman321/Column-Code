@@ -1,37 +1,39 @@
+import json
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/clients")
 
-# A client is considered offline if no heartbeat has been received within this window.
 OFFLINE_AFTER = timedelta(seconds=120)
 
-_clients: dict[str, datetime] = {}  # mac -> last_seen (UTC)
-_sleep_requested: set[str] = set()  # macs with a pending sleep command
+_clients: dict[str, datetime] = {}   # mac -> last_seen (UTC)
 
 
-class HeartbeatPayload(BaseModel):
-    mac: str
+# ── MQTT callbacks (called from mqtt.py dispatcher) ───────────────────────
 
-
-@router.post("/heartbeat")
-def heartbeat(payload: HeartbeatPayload):
-    mac = payload.mac.upper()
+def on_mqtt_heartbeat(mac: str) -> None:
     _clients[mac] = datetime.now(timezone.utc)
-    sleep = mac in _sleep_requested
-    if sleep:
-        _sleep_requested.discard(mac)
-    return {"sleep": sleep}
 
+
+def on_mqtt_status(mac: str, data: str) -> None:
+    try:
+        payload = json.loads(data)
+    except Exception:
+        return
+    if payload.get("connected"):
+        _clients[mac] = datetime.now(timezone.utc)
+
+
+# ── HTTP endpoints (frontend-facing) ─────────────────────────────────────
 
 @router.post("/sleep/{mac}", status_code=204)
-def request_sleep(mac: str) -> None:
+async def request_sleep(mac: str) -> None:
     mac = mac.upper()
     if mac not in _clients:
         raise HTTPException(status_code=404, detail="Unknown client")
-    _sleep_requested.add(mac)
+    from app.mqtt import publish
+    await publish(f"devices/{mac}/cmd", {"sleep": True})
 
 
 @router.get("/")

@@ -21,6 +21,9 @@ def get_color(mac: str):
 
 
 @router.put("/{mac}")
-def set_color(mac: str, color: RGBWColor):
-    _store[mac.upper()] = color.model_dump()
-    return _store[mac.upper()]
+async def set_color(mac: str, color: RGBWColor):
+    mac = mac.upper()
+    _store[mac] = color.model_dump()
+    from app.mqtt import publish
+    await publish(f"devices/{mac}/color", _store[mac], retain=True)
+    return _store[mac]

@@ -2,14 +2,15 @@
 """
 Simulated ESP32 firmware device for testing the Column backend and UI.
 
-Each simulated device runs a heartbeat loop and a log-posting loop in
-separate threads, mirroring what the real firmware does.
+Each simulated device connects to the MQTT broker, mirrors the real firmware
+behaviour: publishes heartbeats and logs, subscribes to color and command
+topics, and sets a Last-Will so the broker marks it offline on disconnect.
 
 Usage:
-    python tools/sim_device.py                         # one device, defaults
-    python tools/sim_device.py --devices 3             # three devices
-    python tools/sim_device.py --server http://host:8000
-    python tools/sim_device.py --mac AA:BB:CC:DD:EE:FF # fixed MAC
+    python tools/sim_device.py                              # one device, defaults
+    python tools/sim_device.py --devices 3                  # three devices
+    python tools/sim_device.py --broker 192.168.1.100:1883  # explicit broker
+    python tools/sim_device.py --mac AA:BB:CC:DD:EE:FF      # fixed MAC
     python tools/sim_device.py --heartbeat 10 --logs 3
 """
 
@@ -19,9 +20,9 @@ import random
 import sys
 import threading
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime
+
+import paho.mqtt.client as mqtt
 
 # ── ANSI colours ──────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
@@ -46,7 +47,7 @@ _LOG_POOL = [
     ("INFO",  "main",      "System initialised"),
     ("INFO",  "wifi",      "Connected to AP, RSSI: -{rssi} dBm"),
     ("INFO",  "ota",       "Firmware up to date"),
-    ("INFO",  "heartbeat", "Heartbeat acknowledged"),
+    ("INFO",  "heartbeat", "Heartbeat sent"),
     ("INFO",  "sensor",    "Temperature: {temp:.1f} C  Humidity: {hum:.0f}%"),
     ("DEBUG", "main",      "Free heap: {heap} bytes"),
     ("DEBUG", "wifi",      "TX power: {txpow} dBm"),
@@ -58,8 +59,8 @@ _LOG_POOL = [
     ("ERROR", "main",      "Sensor read error: I2C NACK"),
 ]
 
+
 def _color_swatch(r: int, g: int, b: int) -> str:
-    """Return a small coloured block using 24-bit ANSI background colour."""
     return f"\033[48;2;{r};{g};{b}m   \033[0m"
 
 
@@ -89,20 +90,13 @@ def _log(mac: str, text: str) -> None:
     print(f"  {DIM}{_now()}{RESET}  {CYAN}{mac}{RESET}  {text}")
 
 
-def post_json(url: str, payload: dict, timeout: int = 5) -> int:
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url, data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status
-
-
-def get_json(url: str, timeout: int = 5) -> dict:
-    with urllib.request.urlopen(url, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+def parse_broker(broker_str: str) -> tuple[str, int]:
+    """Accept 'host', 'host:port', or 'mqtt://host:port'."""
+    s = broker_str.removeprefix("mqtt://")
+    if ":" in s:
+        host, port = s.rsplit(":", 1)
+        return host, int(port)
+    return s, 1883
 
 
 # ── Simulated device ──────────────────────────────────────────────────────────
@@ -110,83 +104,122 @@ class SimDevice:
     def __init__(
         self,
         mac: str,
-        server: str,
+        broker_host: str,
+        broker_port: int,
         heartbeat_interval: float,
         log_interval: float,
-        color_interval: float,
     ):
         self.mac = mac
-        self.server = server.rstrip("/")
         self.heartbeat_interval = heartbeat_interval
         self.log_interval = log_interval
-        self.color_interval = color_interval
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
 
+        self._t_heartbeat = f"devices/{mac}/heartbeat"
+        self._t_logs      = f"devices/{mac}/logs"
+        self._t_color     = f"devices/{mac}/color"
+        self._t_cmd       = f"devices/{mac}/cmd"
+        self._t_status    = f"devices/{mac}/status"
+
+        self._client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2,
+            client_id=f"sim-{mac}",
+        )
+        self._client.will_set(
+            self._t_status,
+            json.dumps({"connected": False}),
+            qos=1, retain=True,
+        )
+        self._client.on_connect = self._on_connect
+        self._client.on_message = self._on_message
+        self._client.connect(broker_host, broker_port, keepalive=60)
+        self._client.loop_start()
+
+    # ── MQTT callbacks ────────────────────────────────────────────────────────
+
+    def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
+        if reason_code.is_failure:
+            _log(self.mac, f"{RED}broker connect failed: {reason_code}{RESET}")
+            return
+        client.publish(self._t_status, json.dumps({"connected": True}),
+                       qos=1, retain=True)
+        client.subscribe(self._t_color, qos=1)
+        client.subscribe(self._t_cmd,   qos=1)
+        _log(self.mac, f"{GREEN}connected to broker{RESET}")
+
+    def _on_message(self, client, userdata, msg):
+        try:
+            payload = json.loads(msg.payload.decode())
+        except Exception:
+            payload = {}
+
+        if msg.topic == self._t_color:
+            r = payload.get("r", 0)
+            g = payload.get("g", 0)
+            b = payload.get("b", 0)
+            w = payload.get("w", 0)
+            swatch = _color_swatch(r, g, b)
+            _log(self.mac, f"{CYAN}color{RESET}     {swatch}  "
+                           f"R={r:3d} G={g:3d} B={b:3d} W={w:3d}")
+        elif msg.topic == self._t_cmd:
+            if payload.get("sleep"):
+                _log(self.mac, f"{YELLOW}cmd{RESET}       sleep requested")
+
+    # ── Background threads ────────────────────────────────────────────────────
+
     def _heartbeat_loop(self) -> None:
         while not self._stop.is_set():
-            try:
-                status = post_json(f"{self.server}/clients/heartbeat", {"mac": self.mac})
-                _log(self.mac, f"{GREEN}heartbeat{RESET} → {status}")
-            except Exception as exc:
-                _log(self.mac, f"{RED}heartbeat failed:{RESET} {exc}")
+            self._client.publish(self._t_heartbeat, "{}", qos=1)
+            _log(self.mac, f"{GREEN}heartbeat{RESET} →")
             self._stop.wait(self.heartbeat_interval)
 
     def _log_loop(self) -> None:
         while not self._stop.is_set():
             level, tag, template = random.choice(_LOG_POOL)
             message = _render_message(template)
-            try:
-                post_json(f"{self.server}/logs/", {
-                    "mac":     self.mac,
-                    "level":   level,
-                    "tag":     tag,
-                    "message": message,
-                })
-                color = LEVEL_COLOR.get(level, WHITE)
-                _log(self.mac, f"{color}{level:<5}{RESET}  [{tag}] {message}")
-            except Exception as exc:
-                _log(self.mac, f"{RED}log post failed:{RESET} {exc}")
+            self._client.publish(
+                self._t_logs,
+                json.dumps({"level": level, "tag": tag, "message": message}),
+                qos=0,
+            )
+            color = LEVEL_COLOR.get(level, WHITE)
+            _log(self.mac, f"{color}{level:<5}{RESET}  [{tag}] {message}")
             self._stop.wait(self.log_interval)
 
-    def _color_loop(self) -> None:
-        while not self._stop.is_set():
-            try:
-                color = get_json(f"{self.server}/colors/{self.mac}")
-                r, g, b, w = color["r"], color["g"], color["b"], color["w"]
-                swatch = _color_swatch(r, g, b)
-                _log(self.mac, f"{CYAN}color{RESET}     {swatch}  "
-                               f"R={r:3d} G={g:3d} B={b:3d} W={w:3d}")
-            except Exception as exc:
-                _log(self.mac, f"{RED}color fetch failed:{RESET} {exc}")
-            self._stop.wait(self.color_interval)
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self) -> None:
-        for target in (self._heartbeat_loop, self._log_loop, self._color_loop):
+        for target in (self._heartbeat_loop, self._log_loop):
             t = threading.Thread(target=target, daemon=True)
             t.start()
             self._threads.append(t)
 
     def stop(self) -> None:
         self._stop.set()
+        # Publish a clean offline status before disconnecting.
+        self._client.publish(self._t_status, json.dumps({"connected": False}),
+                             qos=1, retain=True)
+        self._client.disconnect()
+        self._client.loop_stop()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(description="Simulate ESP32 firmware devices")
-    parser.add_argument("--server",    default="http://127.0.0.1:8000",
-                        help="Backend base URL (default: http://127.0.0.1:8000)")
+    parser.add_argument("--broker",    default="localhost:1883",
+                        help="MQTT broker address, host:port or mqtt://host:port "
+                             "(default: localhost:1883)")
     parser.add_argument("--devices",   type=int, default=1,
                         help="Number of devices to simulate (default: 1)")
     parser.add_argument("--mac",       default=None,
                         help="Fixed MAC for the first device (random if omitted)")
     parser.add_argument("--heartbeat", type=float, default=30.0,
-                        help="Heartbeat interval in seconds (default: 30)")
+                        help="Heartbeat publish interval in seconds (default: 30)")
     parser.add_argument("--logs",      type=float, default=5.0,
-                        help="Log post interval in seconds (default: 5)")
-    parser.add_argument("--color",     type=float, default=5.0,
-                        help="Color poll interval in seconds (default: 5)")
+                        help="Log publish interval in seconds (default: 5)")
     args = parser.parse_args()
+
+    broker_host, broker_port = parse_broker(args.broker)
 
     macs = []
     for i in range(args.devices):
@@ -196,16 +229,15 @@ def main() -> None:
             macs.append(random_mac())
 
     print(f"\n{BOLD}Column device simulator{RESET}")
-    print(f"  server    : {args.server}")
+    print(f"  broker    : {broker_host}:{broker_port}")
     print(f"  devices   : {args.devices}")
     print(f"  heartbeat : every {args.heartbeat}s")
     print(f"  logs      : every {args.logs}s")
-    print(f"  color     : every {args.color}s")
     print(f"  MACs      : {', '.join(macs)}")
     print(f"\n{DIM}Press Ctrl-C to stop{RESET}\n")
 
     devices = [
-        SimDevice(mac, args.server, args.heartbeat, args.logs, args.color)
+        SimDevice(mac, broker_host, broker_port, args.heartbeat, args.logs)
         for mac in macs
     ]
 
