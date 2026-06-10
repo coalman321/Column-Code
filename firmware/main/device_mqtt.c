@@ -5,10 +5,18 @@
 #include "esp_log.h"
 #include "mqtt_client.h"   /* ESP-IDF MQTT component */
 #include "device_mac.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+#include "freertos/task.h"
 
 static const char *TAG = "device_mqtt";
 
 #define MAX_SUBS 8
+
+#define RECONNECT_DELAY_MIN_MS  (30  * 1000)
+#define RECONNECT_DELAY_MAX_MS  (120 * 1000)
+
+#define EG_DISCONNECTED BIT0
 
 typedef struct {
     const char        *topic;
@@ -20,8 +28,10 @@ static sub_t s_subs[MAX_SUBS];
 static int   s_nsubs     = 0;
 static bool  s_connected = false;
 
-static esp_mqtt_client_handle_t s_client = NULL;
-static char s_status_topic[64];  /* "devices/{mac}/status" */
+static esp_mqtt_client_handle_t s_client      = NULL;
+static EventGroupHandle_t       s_eg          = NULL;
+static uint32_t                 s_delay_ms    = RECONNECT_DELAY_MIN_MS;
+static char s_status_topic[64];
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -45,6 +55,31 @@ static void dispatch(const char *topic, int tlen, const char *data, int dlen)
     ESP_LOGD(TAG, "unhandled topic: %.*s", tlen, topic);
 }
 
+/* ── Reconnect task ──────────────────────────────────────────────────────── */
+
+static void reconnect_task(void *arg)
+{
+    while (1) {
+        /* Block until a disconnect event is signalled. */
+        xEventGroupWaitBits(s_eg, EG_DISCONNECTED,
+                            pdTRUE,   /* clear on exit */
+                            pdFALSE,
+                            portMAX_DELAY);
+
+        ESP_LOGW(TAG, "broker unreachable — retrying in %lu s",
+                 (unsigned long)(s_delay_ms / 1000));
+        vTaskDelay(pdMS_TO_TICKS(s_delay_ms));
+
+        /* Exponential backoff, capped at max. */
+        s_delay_ms *= 2;
+        if (s_delay_ms > RECONNECT_DELAY_MAX_MS) {
+            s_delay_ms = RECONNECT_DELAY_MAX_MS;
+        }
+
+        esp_mqtt_client_reconnect(s_client);
+    }
+}
+
 /* ── MQTT event handler ──────────────────────────────────────────────────── */
 
 static void mqtt_event_handler(void *arg,
@@ -57,7 +92,7 @@ static void mqtt_event_handler(void *arg,
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
             s_connected = true;
-            /* Announce presence and set retained status. */
+            s_delay_ms  = RECONNECT_DELAY_MIN_MS;   /* reset backoff on success */
             esp_mqtt_client_publish(s_client, s_status_topic,
                                     "{\"connected\":true}", 0, 1, 1);
             resubscribe_all();
@@ -67,6 +102,7 @@ static void mqtt_event_handler(void *arg,
         case MQTT_EVENT_DISCONNECTED:
             s_connected = false;
             ESP_LOGW(TAG, "disconnected");
+            xEventGroupSetBits(s_eg, EG_DISCONNECTED);
             break;
 
         case MQTT_EVENT_DATA:
@@ -74,8 +110,7 @@ static void mqtt_event_handler(void *arg,
             break;
 
         case MQTT_EVENT_ERROR:
-            ESP_LOGE(TAG, "error type=%d",
-                     ev->error_handle->error_type);
+            ESP_LOGE(TAG, "error type=%d", ev->error_handle->error_type);
             break;
 
         default:
@@ -104,20 +139,26 @@ esp_err_t device_mqtt_start(const char *broker_url)
     device_mac_get_str(mac);
     snprintf(s_status_topic, sizeof(s_status_topic), "devices/%s/status", mac);
 
+    s_eg = xEventGroupCreate();
+
     esp_mqtt_client_config_t cfg = {
-        .broker.address.uri = broker_url,
-        .session.last_will  = {
-            .topic  = s_status_topic,
-            .msg    = "{\"connected\":false}",
-            .msg_len = 0,   /* 0 = use strlen */
-            .qos    = 1,
-            .retain = 1,
+        .broker.address.uri              = broker_url,
+        .network.disable_auto_reconnect  = true,
+        .session.last_will = {
+            .topic   = s_status_topic,
+            .msg     = "{\"connected\":false}",
+            .msg_len = 0,
+            .qos     = 1,
+            .retain  = 1,
         },
     };
 
     s_client = esp_mqtt_client_init(&cfg);
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID,
                                    mqtt_event_handler, NULL);
+
+    xTaskCreate(reconnect_task, "mqtt_reconnect", 2048, NULL, 4, NULL);
+
     return esp_mqtt_client_start(s_client);
 }
 

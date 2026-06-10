@@ -130,7 +130,9 @@ class SimDevice:
             json.dumps({"connected": False}),
             qos=1, retain=True,
         )
+        self._client.reconnect_delay_set(min_delay=30, max_delay=120)
         self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
         self._client.connect(broker_host, broker_port, keepalive=60)
         self._client.loop_start()
@@ -146,6 +148,9 @@ class SimDevice:
         client.subscribe(self._t_color, qos=1)
         client.subscribe(self._t_cmd,   qos=1)
         _log(self.mac, f"{GREEN}connected to broker{RESET}")
+
+    def _on_disconnect(self, _client, _userdata, _disconnect_flags, reason_code, _properties):
+        _log(self.mac, f"{YELLOW}disconnected ({reason_code}) — will retry with backoff (30–120 s){RESET}")
 
     def _on_message(self, client, userdata, msg):
         try:
