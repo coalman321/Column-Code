@@ -76,6 +76,7 @@
   }
 
   async function sleepAll() {
+    if (!confirm(`Send sleep request to all ${online} online client${online === 1 ? '' : 's'}?`)) return;
     sleepAllPending = true;
     try {
       await Promise.allSettled(
