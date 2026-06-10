@@ -17,7 +17,9 @@
       "Bash(git pull *)",
       "Bash(git checkout *)",
       "Bash(chmod +x /home/coalman321/column-project/firmware/setup_idf.sh)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(chmod +x /home/coalman321/column-project/tools/sim_device.py)",
+      "Bash(python3 /home/coalman321/column-project/tools/sim_device.py --help)"
     ]
   }
 }

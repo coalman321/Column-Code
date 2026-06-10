@@ -20,8 +20,9 @@
 
   /* Sync internal state → bound value whenever any channel changes. */
   $effect(() => {
-    value = { r, g, b, w };
-    onchange?.(value);
+    const v = { r, g, b, w };
+    value = v;
+    onchange?.(v);
   });
 
   /* RGB preview blends the colour with white via the W channel. */

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import ColorPicker from './ColorPicker.svelte';
+  import type { RGBWColor } from './ColorPicker.svelte';
 
   interface Client {
     mac: string;
@@ -7,10 +9,16 @@
     connected: boolean;
   }
 
-  let clients    = $state<Client[]>([]);
-  let loading    = $state(false);
-  let error      = $state<string | null>(null);
+  let clients     = $state<Client[]>([]);
+  let loading     = $state(false);
+  let error       = $state<string | null>(null);
   let autoRefresh = $state(true);
+  let colors      = $state<Record<string, RGBWColor>>({});
+  let openMac      = $state<string | null>(null);
+  let popoverStyle = $state('');
+  let listEl       = $state<HTMLElement | null>(null);
+
+  const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
   async function fetchClients() {
     loading = true;
@@ -19,11 +27,55 @@
       const res = await fetch('/clients/');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       clients = await res.json();
+      for (const c of clients) {
+        if (!colors[c.mac]) fetchColor(c.mac);
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Fetch failed';
     } finally {
       loading = false;
     }
+  }
+
+  async function fetchColor(mac: string) {
+    try {
+      const res = await fetch(`/colors/${mac}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      colors[mac] = await res.json();
+    } catch {
+      colors[mac] = { r: 0, g: 0, b: 0, w: 0 };
+    }
+  }
+
+  function putColor(mac: string, color: RGBWColor) {
+    clearTimeout(debounceTimers[mac]);
+    debounceTimers[mac] = setTimeout(async () => {
+      try {
+        await fetch(`/colors/${mac}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(color),
+        });
+      } catch { /* device retains last color */ }
+    }, 150);
+  }
+
+  function swatchBg(c: RGBWColor): string {
+    const a = c.w / 255;
+    const blend = (ch: number) => Math.round(ch + (255 - ch) * a);
+    return `rgb(${blend(c.r)}, ${blend(c.g)}, ${blend(c.b)})`;
+  }
+
+  function openPicker(mac: string, e: MouseEvent) {
+    e.stopPropagation();
+    if (openMac === mac) { openMac = null; return; }
+    if (!listEl) return;
+    const swatchRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const listRect   = listEl.getBoundingClientRect();
+    const top   = swatchRect.bottom - listRect.top + 8;
+    const right = listRect.right - swatchRect.right;
+    popoverStyle = `top:${top}px;right:${right}px`;
+    openMac = mac;
   }
 
   onMount(() => {
@@ -37,13 +89,15 @@
 
   function timeAgo(iso: string) {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 60)  return `${diff}s ago`;
+    if (diff < 60)   return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     return `${Math.floor(diff / 3600)}h ago`;
   }
 </script>
 
-<div class="client-list">
+<svelte:window onclick={() => { openMac = null; }} />
+
+<div class="client-list" bind:this={listEl}>
   <div class="toolbar">
     <h2>Connected Clients</h2>
 
@@ -74,18 +128,46 @@
   {:else}
     <ul>
       {#each clients as client}
+        {@const color = colors[client.mac]}
         <li class:online={client.connected} class:offline={!client.connected}>
           <div class="dot"></div>
           <span class="mac">{client.mac}</span>
           <span class="time">{timeAgo(client.last_seen)}</span>
+          <button
+            class="swatch"
+            class:active={openMac === client.mac}
+            style={color ? `--bg: ${swatchBg(color)}` : undefined}
+            onclick={(e) => openPicker(client.mac, e)}
+            aria-label="Set color for {client.mac}"
+          ></button>
         </li>
       {/each}
     </ul>
+  {/if}
+  {#if openMac}
+    {@const mac = openMac}
+    <div
+      class="popover"
+      style={popoverStyle}
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-label="Color picker"
+    >
+      {#if colors[mac]}
+        <ColorPicker
+          bind:value={colors[mac]}
+          onchange={(c) => putColor(mac, c)}
+        />
+      {:else}
+        <p class="popover-loading">Loading…</p>
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
   .client-list {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -195,6 +277,49 @@
     font-size: 0.8rem;
     color: #555;
     white-space: nowrap;
+  }
+
+  /* ── color swatch button ── */
+  .swatch {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 5px;
+    border: 2px solid #333;
+    background: var(--bg, #1a1a1a);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .swatch:hover {
+    border-color: #666;
+    background: var(--bg, #1a1a1a);
+  }
+
+  .swatch.active {
+    border-color: #888;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.1);
+    background: var(--bg, #1a1a1a);
+  }
+
+  /* ── popover ── */
+  .popover {
+    position: absolute;
+    z-index: 200;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+
+  .popover-loading {
+    color: #555;
+    font-size: 0.85rem;
+    margin: 0;
+    padding: 0.5rem;
+    font-family: system-ui, sans-serif;
   }
 
   /* ── misc ── */

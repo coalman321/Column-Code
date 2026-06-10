@@ -1,20 +1,9 @@
 <script lang="ts">
   import LogViewer from '$lib/components/LogViewer.svelte';
-  import ColorPicker from '$lib/components/ColorPicker.svelte';
   import ClientList from '$lib/components/ClientList.svelte';
-  import type { RGBWColor } from '$lib/components/ColorPicker.svelte';
-
-  let color = $state<RGBWColor>({ r: 255, g: 0, b: 0, w: 0 });
 </script>
 
 <main>
-  <section>
-    <ColorPicker bind:value={color} />
-    <p class="values">
-      R {color.r} · G {color.g} · B {color.b} · W {color.w}
-    </p>
-  </section>
-
   <section>
     <ClientList />
   </section>
@@ -34,10 +23,10 @@
     gap: 2rem;
   }
 
-  .values {
-    margin: 0.5rem 0 0;
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #888;
+  section {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
   }
 </style>

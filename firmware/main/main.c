@@ -10,6 +10,7 @@
 #include "ota.h"
 #include "remote_log.h"
 #include "heartbeat.h"
+#include "color.h"
 
 #define SERVER_TIMEOUT_US \
     ((int64_t)CONFIG_SERVER_TIMEOUT_MINUTES * 60 * 1000 * 1000)
@@ -80,6 +81,14 @@ static void ota_task(void *arg)
     }
 }
 
+static void color_task(void *arg)
+{
+    while (1) {
+        color_fetch_and_apply();
+        vTaskDelay(pdMS_TO_TICKS((uint32_t)CONFIG_COLOR_POLL_INTERVAL_SECONDS * 1000));
+    }
+}
+
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -94,8 +103,10 @@ void app_main(void)
 
     remote_log_init(CONFIG_SERVER_BASE_URL);
     heartbeat_init(CONFIG_SERVER_BASE_URL);
+    color_init(CONFIG_SERVER_BASE_URL);
 
     ESP_LOGI(TAG, "WiFi ready");
     xTaskCreate(heartbeat_task, "heartbeat", 4096, NULL, 5, NULL);
     xTaskCreate(ota_task,       "ota",       8192, NULL, 4, NULL);
+    xTaskCreate(color_task,     "color",     4096, NULL, 3, NULL);
 }

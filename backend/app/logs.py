@@ -7,6 +7,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/logs")
 
 _store: list[dict] = []
+_MAX_ENTRIES = 500
 
 
 class LogEntry(BaseModel):
@@ -26,6 +27,8 @@ def post_log(entry: LogEntry):
         "message":     entry.message,
         "received_at": received_at,
     })
+    if len(_store) > _MAX_ENTRIES:
+        del _store[: len(_store) - _MAX_ENTRIES]
     return {"status": "ok", "received_at": received_at}
 
 

@@ -20,7 +20,7 @@
 
   /* Level filtering is client-side; MAC filtering is server-side. */
   let filtered = $derived(
-    levelFilter ? logs.filter(l => l.level === levelFilter) : logs
+    (levelFilter ? logs.filter(l => l.level === levelFilter) : logs).toReversed()
   );
 
   /* Populate the MAC dropdown from logs already in memory. */
