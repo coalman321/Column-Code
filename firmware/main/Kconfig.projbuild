@@ -12,18 +12,20 @@ menu "Column Firmware Configuration"
         help
             Password for the WiFi network.
 
+    config MQTT_BROKER_URL
+        string "MQTT Broker URL"
+        default "mqtt://192.168.1.1:1883"
+        help
+            URL of the MQTT broker (e.g. mqtt://192.168.1.100:1883).
+            All real-time communication (color, heartbeat, logs, commands)
+            uses MQTT.
+
     config SERVER_BASE_URL
-        string "HTTP Server Base URL"
+        string "HTTP Server Base URL (OTA only)"
         default "http://192.168.1.1:8000"
         help
-            Base URL of the HTTP server (e.g. http://192.168.1.100:8000).
-
-    config HTTP_POLL_INTERVAL_MS
-        int "HTTP poll interval (ms)"
-        default 5000
-        range 1000 60000
-        help
-            How often to send an HTTP request to the server, in milliseconds.
+            Base URL of the HTTP server used only for OTA firmware updates
+            (/firmware/hash and /firmware/bin endpoints).
 
     config SERVER_TIMEOUT_MINUTES
         int "Server unreachable timeout (minutes)"
@@ -52,9 +54,8 @@ menu "Column Firmware Configuration"
         default 30
         range 5 3600
         help
-            How often the device posts its MAC to /clients/heartbeat to signal
-            it is online. The server marks a client offline after 120 seconds
-            of no heartbeat.
+            How often the device publishes to devices/{mac}/heartbeat to signal
+            it is online.
 
     config OTA_CHECK_INTERVAL_MINUTES
         int "OTA check interval (minutes)"
@@ -63,14 +64,6 @@ menu "Column Firmware Configuration"
         help
             How often to compare the running firmware hash with the server and
             apply an update if they differ.
-
-    config COLOR_POLL_INTERVAL_SECONDS
-        int "Color poll interval (seconds)"
-        default 5
-        range 1 3600
-        help
-            How often the device polls /colors/{mac} from the server and
-            drives the SK6812 LEDs with the result.
 
     config COLOR_GPIO_DATA
         int "GPIO for SK6812 data line"
