@@ -47,4 +47,21 @@ menu "Column Firmware Configuration"
             Enable if the wakeup pin is pulled high and driven low to trigger
             (e.g. a button to GND with internal pull-up). Disable for active high.
 
+    config HEARTBEAT_INTERVAL_SECONDS
+        int "Heartbeat interval (seconds)"
+        default 30
+        range 5 3600
+        help
+            How often the device posts its MAC to /clients/heartbeat to signal
+            it is online. The server marks a client offline after 120 seconds
+            of no heartbeat.
+
+    config OTA_CHECK_INTERVAL_MINUTES
+        int "OTA check interval (minutes)"
+        default 60
+        range 1 1440
+        help
+            How often to compare the running firmware hash with the server and
+            apply an update if they differ.
+
 endmenu

@@ -7,7 +7,9 @@
 #include "freertos/task.h"
 
 #include "wifi.h"
-#include "http_client.h"
+#include "ota.h"
+#include "remote_log.h"
+#include "heartbeat.h"
 
 #define SERVER_TIMEOUT_US \
     ((int64_t)CONFIG_SERVER_TIMEOUT_MINUTES * 60 * 1000 * 1000)
@@ -34,43 +36,47 @@ static void configure_wakeup_gpio(void)
     ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
 }
 
-static void enter_light_sleep(void)
-{
-    ESP_LOGW(TAG, "Server unreachable for %d min — entering light sleep. "
-                  "Wake on GPIO %d.",
-             CONFIG_SERVER_TIMEOUT_MINUTES, CONFIG_WAKEUP_GPIO_PIN);
-    esp_light_sleep_start();
-    ESP_LOGI(TAG, "Woke from light sleep (cause: %d)",
-             (int)esp_sleep_get_wakeup_cause());
-}
-
-static void http_poll_task(void *arg)
+static void heartbeat_task(void *arg)
 {
     int64_t first_fail_us = 0;
-    bool server_failing   = false;
+    bool    failing       = false;
 
     while (1) {
-        esp_err_t err = http_get(CONFIG_SERVER_BASE_URL);
+        esp_err_t err = heartbeat_send();
 
         if (err == ESP_OK) {
-            first_fail_us  = 0;
-            server_failing = false;
+            first_fail_us = 0;
+            failing       = false;
         } else {
-            if (!server_failing) {
-                first_fail_us  = esp_timer_get_time();
-                server_failing = true;
+            if (!failing) {
+                first_fail_us = esp_timer_get_time();
+                failing       = true;
             }
 
             int64_t elapsed = esp_timer_get_time() - first_fail_us;
             if (elapsed >= SERVER_TIMEOUT_US) {
-                enter_light_sleep();
-                /* reset failure window after wakeup */
-                first_fail_us  = 0;
-                server_failing = false;
+                ESP_LOGW(TAG, "Server unreachable for %d min — entering light sleep. "
+                              "Wake on GPIO %d.",
+                         CONFIG_SERVER_TIMEOUT_MINUTES, CONFIG_WAKEUP_GPIO_PIN);
+                esp_light_sleep_start();
+                ESP_LOGI(TAG, "Woke from light sleep (cause: %d)",
+                         (int)esp_sleep_get_wakeup_cause());
+                first_fail_us = 0;
+                failing       = false;
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(CONFIG_HTTP_POLL_INTERVAL_MS));
+        vTaskDelay(pdMS_TO_TICKS((uint32_t)CONFIG_HEARTBEAT_INTERVAL_SECONDS * 1000));
+    }
+}
+
+static void ota_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(10000));
+    while (1) {
+        ota_check_and_update(CONFIG_SERVER_BASE_URL);
+        vTaskDelay(pdMS_TO_TICKS(
+            (uint32_t)CONFIG_OTA_CHECK_INTERVAL_MINUTES * 60 * 1000));
     }
 }
 
@@ -84,9 +90,12 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     configure_wakeup_gpio();
-
     ESP_ERROR_CHECK(wifi_init_sta());
 
-    ESP_LOGI(TAG, "WiFi ready, starting HTTP poll task");
-    xTaskCreate(http_poll_task, "http_poll", 8192, NULL, 5, NULL);
+    remote_log_init(CONFIG_SERVER_BASE_URL);
+    heartbeat_init(CONFIG_SERVER_BASE_URL);
+
+    ESP_LOGI(TAG, "WiFi ready");
+    xTaskCreate(heartbeat_task, "heartbeat", 4096, NULL, 5, NULL);
+    xTaskCreate(ota_task,       "ota",       8192, NULL, 4, NULL);
 }

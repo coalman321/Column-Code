@@ -16,7 +16,8 @@
       "Bash(git fetch *)",
       "Bash(git pull *)",
       "Bash(git checkout *)",
-      "Bash(chmod +x /home/coalman321/column-project/firmware/setup_idf.sh)"
+      "Bash(chmod +x /home/coalman321/column-project/firmware/setup_idf.sh)",
+      "Bash(npm run *)"
     ]
   }
 }
