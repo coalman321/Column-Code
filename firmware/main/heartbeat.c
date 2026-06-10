@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "cJSON.h"
 #include "device_mac.h"
+#include "color.h"
 
 static const char *TAG = "heartbeat";
 
@@ -122,6 +123,7 @@ static void heartbeat_task(void *arg)
             if (sleep_req) {
                 ESP_LOGI(TAG, "Sleep requested by server — entering light sleep. "
                               "Wake on GPIO %d.", CONFIG_WAKEUP_GPIO_PIN);
+                color_apply(0, 0, 0, 0);
                 esp_light_sleep_start();
                 ESP_LOGI(TAG, "Woke from light sleep (cause: %d)",
                          (int)esp_sleep_get_wakeup_cause());
@@ -137,6 +139,7 @@ static void heartbeat_task(void *arg)
                 ESP_LOGW(TAG, "Server unreachable for %d min — entering light sleep. "
                               "Wake on GPIO %d.",
                          CONFIG_SERVER_TIMEOUT_MINUTES, CONFIG_WAKEUP_GPIO_PIN);
+                color_apply(0, 0, 0, 0);
                 esp_light_sleep_start();
                 ESP_LOGI(TAG, "Woke from light sleep (cause: %d)",
                          (int)esp_sleep_get_wakeup_cause());
