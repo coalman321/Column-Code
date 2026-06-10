@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
-#include "esp_mac.h"
 #include "esp_http_client.h"
+#include "device_mac.h"
 #include "esp_rom_sys.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
@@ -53,11 +53,8 @@ static esp_err_t on_http_event(esp_http_client_event_t *evt)
 
 esp_err_t color_init(const char *server_base_url)
 {
-    uint8_t mac[6];
-    esp_efuse_mac_get_default(mac);
-    char mac_str[18];
-    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    char mac_str[DEVICE_MAC_STR_LEN];
+    device_mac_get_str(mac_str);
     snprintf(s_url, sizeof(s_url), "%s/colors/%s", server_base_url, mac_str);
 
     rmt_tx_channel_config_t tx_cfg = {

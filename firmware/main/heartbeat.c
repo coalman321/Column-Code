@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
-#include "esp_mac.h"
 #include "esp_http_client.h"
 #include "cJSON.h"
+#include "device_mac.h"
 
 static const char *TAG = "heartbeat";
 
@@ -15,11 +15,7 @@ static bool s_ready = false;
 
 void heartbeat_init(const char *server_base_url)
 {
-    uint8_t mac[6];
-    esp_efuse_mac_get_default(mac);
-    snprintf(s_mac, sizeof(s_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
+    device_mac_get_str(s_mac);
     snprintf(s_url, sizeof(s_url), "%s/clients/heartbeat", server_base_url);
     s_ready = true;
 
