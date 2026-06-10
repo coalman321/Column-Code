@@ -51,7 +51,7 @@ async def _dispatch(message: aiomqtt.Message) -> None:
         on_mqtt_log(mac, data)
     elif subtopic == "status":
         from app.clients import on_mqtt_status
-        on_mqtt_status(mac, data)
+        await on_mqtt_status(mac, data)
 
 
 async def run() -> None:

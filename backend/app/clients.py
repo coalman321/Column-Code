@@ -16,13 +16,21 @@ def on_mqtt_heartbeat(mac: str) -> None:
     _clients[mac] = datetime.now(timezone.utc)
 
 
-def on_mqtt_status(mac: str, data: str) -> None:
+async def on_mqtt_status(mac: str, data: str) -> None:
     try:
         payload = json.loads(data)
     except Exception:
         return
-    if payload.get("connected"):
-        _clients[mac] = datetime.now(timezone.utc)
+    if not payload.get("connected"):
+        return
+    is_new = mac not in _clients
+    _clients[mac] = datetime.now(timezone.utc)
+    if is_new:
+        from app.colors import get_last_color
+        from app.mqtt import publish
+        last = get_last_color()
+        if last is not None:
+            await publish(f"devices/{mac}/color", last, retain=True)
 
 
 # ── HTTP endpoints (frontend-facing) ─────────────────────────────────────

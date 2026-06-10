@@ -15,6 +15,10 @@ import app.mqtt as mqtt_manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.db import init_db
+    from app.colors import load_from_db
+    init_db()
+    load_from_db()
     task = asyncio.create_task(mqtt_manager.run())
     yield
     task.cancel()

@@ -19,7 +19,7 @@ COPY --from=web-builder /build/build web_app/build/
 # firmware/app.bin is served from backend/firmware/app.bin at runtime.
 # Mount a volume or copy the binary in before running if OTA is needed:
 #   docker run -v /path/to/app.bin:/app/backend/firmware/app.bin ...
-RUN mkdir -p backend/firmware
+RUN mkdir -p backend/firmware backend/data
 
 WORKDIR /app/backend
 EXPOSE 8000
