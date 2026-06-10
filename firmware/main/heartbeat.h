@@ -1,6 +1,5 @@
 #pragma once
 
-#include "esp_err.h"
-
-void    heartbeat_init(const char *server_base_url);
-esp_err_t heartbeat_send(void);
+/* Configure wakeup GPIO, init HTTP state, then spawn the heartbeat task.
+   Handles all light-sleep logic internally — callers need no sleep includes. */
+void heartbeat_start(const char *server_base_url);

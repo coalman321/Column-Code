@@ -19,6 +19,12 @@
   let listEl       = $state<HTMLElement | null>(null);
 
   const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  let sleepPending    = $state<Record<string, boolean>>({});
+  let sleepAllPending = $state(false);
+  let allColor        = $state<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 });
+  let openAll         = $state(false);
+  let allSwatchEl     = $state<HTMLElement | null>(null);
+  let allPopoverStyle = $state('');
 
   async function fetchClients() {
     loading = true;
@@ -60,6 +66,45 @@
     }, 150);
   }
 
+  async function requestSleep(mac: string) {
+    sleepPending = { ...sleepPending, [mac]: true };
+    try {
+      await fetch(`/clients/sleep/${mac}`, { method: 'POST' });
+    } catch { /* ignore */ } finally {
+      sleepPending = { ...sleepPending, [mac]: false };
+    }
+  }
+
+  async function sleepAll() {
+    sleepAllPending = true;
+    try {
+      await Promise.allSettled(
+        clients.filter(c => c.connected).map(c => fetch(`/clients/sleep/${c.mac}`, { method: 'POST' }))
+      );
+    } finally {
+      sleepAllPending = false;
+    }
+  }
+
+  function putAllColor(color: RGBWColor) {
+    for (const c of clients) {
+      colors[c.mac] = color;
+      putColor(c.mac, color);
+    }
+  }
+
+  function openAllPicker(e: MouseEvent) {
+    e.stopPropagation();
+    if (openAll) { openAll = false; return; }
+    if (!listEl || !allSwatchEl) return;
+    const swatchRect = allSwatchEl.getBoundingClientRect();
+    const listRect   = listEl.getBoundingClientRect();
+    const top   = swatchRect.bottom - listRect.top + 8;
+    const right = listRect.right - swatchRect.right;
+    allPopoverStyle = `top:${top}px;right:${right}px`;
+    openAll = true;
+  }
+
   function swatchBg(c: RGBWColor): string {
     const a = c.w / 255;
     const blend = (ch: number) => Math.round(ch + (255 - ch) * a);
@@ -95,7 +140,7 @@
   }
 </script>
 
-<svelte:window onclick={() => { openMac = null; }} />
+<svelte:window onclick={() => { openMac = null; openAll = false; }} />
 
 <div class="client-list" bind:this={listEl}>
   <div class="toolbar">
@@ -116,6 +161,21 @@
       <button onclick={() => fetchClients()} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}
       </button>
+      <button
+        class="sleep-btn"
+        onclick={sleepAll}
+        disabled={sleepAllPending || online === 0}
+        title="Send sleep request to all online clients"
+      >{sleepAllPending ? '…' : 'Sleep All'}</button>
+      <button
+        bind:this={allSwatchEl}
+        class="swatch"
+        class:active={openAll}
+        style={`--bg: ${swatchBg(allColor)}`}
+        onclick={openAllPicker}
+        title="Set color on all clients"
+        aria-label="Set color on all clients"
+      ></button>
     </div>
   </div>
 
@@ -134,6 +194,13 @@
           <span class="mac">{client.mac}</span>
           <span class="time">{timeAgo(client.last_seen)}</span>
           <button
+            class="sleep-btn"
+            onclick={() => requestSleep(client.mac)}
+            disabled={sleepPending[client.mac] || !client.connected}
+            aria-label="Sleep {client.mac}"
+            title="Send sleep request"
+          >{sleepPending[client.mac] ? '…' : 'Sleep'}</button>
+          <button
             class="swatch"
             class:active={openMac === client.mac}
             style={color ? `--bg: ${swatchBg(color)}` : undefined}
@@ -143,6 +210,20 @@
         </li>
       {/each}
     </ul>
+  {/if}
+  {#if openAll}
+    <div
+      class="popover"
+      style={allPopoverStyle}
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-label="Set color on all clients"
+    >
+      <ColorPicker
+        bind:value={allColor}
+        onchange={(c) => putAllColor(c)}
+      />
+    </div>
   {/if}
   {#if openMac}
     {@const mac = openMac}
@@ -278,6 +359,26 @@
     color: #555;
     white-space: nowrap;
   }
+
+  /* ── sleep button ── */
+  .sleep-btn {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    background: #1e1e2e;
+    color: #8888cc;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .sleep-btn:hover:not(:disabled) {
+    background: #2a2a44;
+    border-color: #6666aa;
+    color: #aaaaee;
+  }
+
+  .sleep-btn:disabled { opacity: 0.35; cursor: default; }
 
   /* ── color swatch button ── */
   .swatch {
