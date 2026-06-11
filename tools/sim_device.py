@@ -11,7 +11,7 @@ Usage:
     python tools/sim_device.py --devices 3                  # three devices
     python tools/sim_device.py --broker 192.168.1.100:1883  # explicit broker
     python tools/sim_device.py --mac AA:BB:CC:DD:EE:FF      # fixed MAC
-    python tools/sim_device.py --heartbeat 10 --logs 3
+    python tools/sim_device.py --heartbeat 1 --logs 3
 """
 
 import argparse
@@ -218,8 +218,8 @@ def main() -> None:
                         help="Number of devices to simulate (default: 1)")
     parser.add_argument("--mac",       default=None,
                         help="Fixed MAC for the first device (random if omitted)")
-    parser.add_argument("--heartbeat", type=float, default=30.0,
-                        help="Heartbeat publish interval in seconds (default: 30)")
+    parser.add_argument("--heartbeat", type=float, default=1.0,
+                        help="Heartbeat publish interval in seconds (default: 1)")
     parser.add_argument("--logs",      type=float, default=5.0,
                         help="Log publish interval in seconds (default: 5)")
     args = parser.parse_args()
@@ -236,7 +236,7 @@ def main() -> None:
     print(f"\n{BOLD}Column device simulator{RESET}")
     print(f"  broker    : {broker_host}:{broker_port}")
     print(f"  devices   : {args.devices}")
-    print(f"  heartbeat : every {args.heartbeat}s")
+    print(f"  heartbeat : every {args.heartbeat}s  (offline threshold: 10s)")
     print(f"  logs      : every {args.logs}s")
     print(f"  MACs      : {', '.join(macs)}")
     print(f"\n{DIM}Press Ctrl-C to stop{RESET}\n")

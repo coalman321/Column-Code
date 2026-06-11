@@ -16,9 +16,11 @@ import app.mqtt as mqtt_manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.db import init_db
-    from app.colors import load_from_db
+    from app.colors import load_from_db as load_colors
+    from app.clients import load_from_db as load_clients
     init_db()
-    load_from_db()
+    load_colors()
+    load_clients()
     task = asyncio.create_task(mqtt_manager.run())
     yield
     task.cancel()
@@ -35,6 +37,11 @@ app.include_router(firmware_router)
 app.include_router(logs_router)
 
 STATIC_DIR = Path(__file__).parent.parent.parent / "web_app" / "build"
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 
 @app.get("/")

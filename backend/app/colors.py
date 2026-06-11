@@ -27,6 +27,10 @@ def load_from_db() -> None:
                        "b": latest["b"], "w": latest["w"]}
 
 
+def remove_from_store(mac: str) -> None:
+    _store.pop(mac, None)
+
+
 class RGBWColor(BaseModel):
     r: int = Field(0, ge=0, le=255)
     g: int = Field(0, ge=0, le=255)

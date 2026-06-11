@@ -20,6 +20,7 @@
 
   const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
   let sleepPending    = $state<Record<string, boolean>>({});
+  let deletePending   = $state<Record<string, boolean>>({});
   let sleepAllPending = $state(false);
   let allColor        = $state<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 });
   let openAll         = $state(false);
@@ -72,6 +73,23 @@
       await fetch(`/clients/sleep/${mac}`, { method: 'POST' });
     } catch { /* ignore */ } finally {
       sleepPending = { ...sleepPending, [mac]: false };
+    }
+  }
+
+  async function deleteClient(mac: string, connected: boolean) {
+    const label = connected ? `⚠ ${mac} is still online. Remove anyway?` : `Remove ${mac}?`;
+    if (!confirm(label)) return;
+    deletePending = { ...deletePending, [mac]: true };
+    try {
+      const res = await fetch(`/clients/${mac}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      clients = clients.filter(c => c.mac !== mac);
+      const { [mac]: _, ...rest } = colors;
+      colors = rest;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Delete failed';
+    } finally {
+      deletePending = { ...deletePending, [mac]: false };
     }
   }
 
@@ -201,6 +219,13 @@
             aria-label="Sleep {client.mac}"
             title="Send sleep request"
           >{sleepPending[client.mac] ? '…' : 'Sleep'}</button>
+          <button
+            class="delete-btn"
+            onclick={() => deleteClient(client.mac, client.connected)}
+            disabled={deletePending[client.mac]}
+            aria-label="Remove {client.mac}"
+            title="Remove client"
+          >{deletePending[client.mac] ? '…' : '✕'}</button>
           <button
             class="swatch"
             class:active={openMac === client.mac}
@@ -380,6 +405,26 @@
   }
 
   .sleep-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* ── delete button ── */
+  .delete-btn {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.75rem;
+    border: 1px solid #3a2a2a;
+    border-radius: 4px;
+    background: #1e1010;
+    color: #cc6666;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .delete-btn:hover:not(:disabled) {
+    background: #3a1a1a;
+    border-color: #aa4444;
+    color: #ee8888;
+  }
+
+  .delete-btn:disabled { opacity: 0.35; cursor: default; }
 
   /* ── color swatch button ── */
   .swatch {

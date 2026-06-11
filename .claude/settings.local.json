@@ -22,7 +22,8 @@
       "Bash(python3 /home/coalman321/column-project/tools/sim_device.py --help)",
       "Bash(pip install *)",
       "Bash(grep -r \"esp_app_get_description\" /home/coalman321/esp/esp-idf/components --include=\"*.h\" -l)",
-      "Read(//home/coalman321/esp/esp-idf/components/**)"
+      "Read(//home/coalman321/esp/esp-idf/components/**)",
+      "Bash(docker compose *)"
     ]
   }
 }

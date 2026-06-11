@@ -27,6 +27,46 @@ def init_db() -> None:
                 last_updated TEXT    NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+                mac       TEXT PRIMARY KEY,
+                last_seen TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_all_clients() -> list[dict]:
+    conn = _connect()
+    try:
+        rows = conn.execute("SELECT mac, last_seen FROM clients").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def save_client(mac: str, last_seen: datetime) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO clients (mac, last_seen)
+            VALUES (?, ?)
+            ON CONFLICT(mac) DO UPDATE SET last_seen = excluded.last_seen
+            """,
+            (mac, last_seen.isoformat()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_client(mac: str) -> None:
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM clients WHERE mac = ?", (mac,))
         conn.commit()
     finally:
         conn.close()
@@ -39,6 +79,15 @@ def load_all_colors() -> list[dict]:
             "SELECT mac, r, g, b, w, last_updated FROM colors"
         ).fetchall()
         return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def delete_color(mac: str) -> None:
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM colors WHERE mac = ?", (mac,))
+        conn.commit()
     finally:
         conn.close()
 
