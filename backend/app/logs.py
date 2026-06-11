@@ -1,8 +1,8 @@
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/logs")
 
@@ -10,32 +10,31 @@ _store: list[dict] = []
 _MAX_ENTRIES = 500
 
 
-class LogEntry(BaseModel):
-    mac: str
-    level: str = "INFO"
-    tag: str = ""
-    message: str
+# ── MQTT callback (called from mqtt.py dispatcher) ────────────────────────
 
-
-@router.post("/", status_code=201)
-def post_log(entry: LogEntry):
+def on_mqtt_log(mac: str, data: str) -> None:
+    try:
+        payload = json.loads(data)
+    except Exception:
+        payload = {}
     received_at = datetime.now(timezone.utc).isoformat()
     _store.append({
-        "mac":         entry.mac,
-        "level":       entry.level.upper(),
-        "tag":         entry.tag,
-        "message":     entry.message,
+        "mac":         mac,
+        "level":       payload.get("level", "INFO").upper(),
+        "tag":         payload.get("tag", ""),
+        "message":     payload.get("message", data),
         "received_at": received_at,
     })
     if len(_store) > _MAX_ENTRIES:
         del _store[: len(_store) - _MAX_ENTRIES]
-    return {"status": "ok", "received_at": received_at}
 
+
+# ── HTTP endpoint (frontend-facing) ──────────────────────────────────────
 
 @router.get("/")
 def get_logs(
     mac: Optional[str] = Query(None, description="Filter by device MAC address"),
     limit: int = Query(100, ge=1, le=1000),
 ):
-    results = _store if mac is None else [e for e in _store if e["mac"] == mac]
+    results = _store if mac is None else [e for e in _store if e["mac"] == mac.upper()]
     return results[-limit:]

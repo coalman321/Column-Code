@@ -1,59 +1,41 @@
 #include "remote_log.h"
 
+#include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
 #include "esp_log.h"
-#include "esp_http_client.h"
 #include "cJSON.h"
 #include "device_mac.h"
+#include "device_mqtt.h"
 
 static const char *TAG = "remote_log";
 
-static char s_log_url[192];
-static char s_mac[18];   /* "AA:BB:CC:DD:EE:FF\0" */
+static char s_log_topic[64];   /* "devices/{mac}/logs" */
+static char s_mac[DEVICE_MAC_STR_LEN];
 static bool s_ready = false;
 
-void remote_log_init(const char *server_base_url)
+void remote_log_init(void)
 {
     device_mac_get_str(s_mac);
-    snprintf(s_log_url, sizeof(s_log_url), "%s/logs/", server_base_url);
+    snprintf(s_log_topic, sizeof(s_log_topic), "devices/%s/logs", s_mac);
     s_ready = true;
-
-    ESP_LOGI(TAG, "remote logging ready (mac=%s, url=%s)", s_mac, s_log_url);
+    ESP_LOGI(TAG, "remote logging ready (mac=%s)", s_mac);
 }
 
 void remote_log_post(const char *level, const char *tag, const char *message)
 {
-    if (!s_ready) {
-        return;
-    }
+    if (!s_ready) return;
 
     cJSON *body = cJSON_CreateObject();
-    cJSON_AddStringToObject(body, "mac",     s_mac);
     cJSON_AddStringToObject(body, "level",   level);
     cJSON_AddStringToObject(body, "tag",     tag);
     cJSON_AddStringToObject(body, "message", message);
     char *json = cJSON_PrintUnformatted(body);
     cJSON_Delete(body);
+    if (!json) return;
 
-    if (!json) {
-        return;
-    }
-
-    esp_http_client_config_t cfg = {
-        .url        = s_log_url,
-        .method     = HTTP_METHOD_POST,
-        .timeout_ms = 5000,
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&cfg);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_post_field(client, json, strlen(json));
-
-    esp_err_t err = esp_http_client_perform(client);
+    esp_err_t err = device_mqtt_publish(s_log_topic, json, 0, 0);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "log post failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "log publish failed");
     }
-
-    esp_http_client_cleanup(client);
     free(json);
 }

@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "wifi.c" "http_client.c" "ota.c" "remote_log.c" "heartbeat.c" "color.c"
+    SRCS "main.c" "wifi.c" "device_mqtt.c" "ota.c" "remote_log.c" "heartbeat.c" "color.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash
@@ -12,5 +12,6 @@ idf_component_register(
         esp_driver_rmt
         app_update
         esp_https_ota
+        mqtt
         json
 )

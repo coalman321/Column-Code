@@ -3,14 +3,9 @@
 #include <stdint.h>
 #include "esp_err.h"
 
-/**
- * Initialise LEDC PWM channels for R/G/B/W and cache the server URL + MAC.
- * Must be called after WiFi is connected.
- */
-esp_err_t color_init(const char *server_base_url);
+/* Set up the RMT/SK6812 driver and register the MQTT color subscription.
+   Must be called before device_mqtt_start(). */
+esp_err_t color_init(void);
 
-/** Drive the four LEDC channels directly (values 0-255). */
+/* Drive the SK6812 LEDs with the given RGBW values (0-255 each). */
 esp_err_t color_apply(uint8_t r, uint8_t g, uint8_t b, uint8_t w);
-
-/** GET /colors/{mac} from the server and apply the result via color_apply(). */
-esp_err_t color_fetch_and_apply(void);

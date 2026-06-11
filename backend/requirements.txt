@@ -39,6 +39,7 @@ examples-rclpy-minimal-client==0.19.7
 examples-rclpy-minimal-publisher==0.19.7
 examples-rclpy-minimal-service==0.19.7
 examples-rclpy-minimal-subscriber==0.19.7
+aiomqtt>=2.3.0
 fastapi==0.136.3
 geographic-msgs==1.0.6
 geometry-msgs==5.3.7

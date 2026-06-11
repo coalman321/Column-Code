@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
-#include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
 #include "cJSON.h"
@@ -73,7 +73,7 @@ static void running_hash_hex(char *out)
 {
     /* app_elf_sha256 is computed from the ELF at build time and embedded
        in esp_app_desc_t; the backend extracts the same bytes from app.bin. */
-    const esp_app_desc_t *desc = esp_ota_get_app_description();
+    const esp_app_desc_t *desc = esp_app_get_description();
     for (int i = 0; i < 32; i++) {
         snprintf(out + i * 2, 3, "%02x", desc->app_elf_sha256[i]);
     }

@@ -8,6 +8,7 @@
 #include "remote_log.h"
 #include "heartbeat.h"
 #include "color.h"
+#include "device_mqtt.h"
 
 static const char *TAG = "main";
 
@@ -21,14 +22,6 @@ static void ota_task(void *arg)
     }
 }
 
-static void color_task(void *arg)
-{
-    while (1) {
-        color_fetch_and_apply();
-        vTaskDelay(pdMS_TO_TICKS((uint32_t)CONFIG_COLOR_POLL_INTERVAL_SECONDS * 1000));
-    }
-}
-
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -39,12 +32,15 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_ERROR_CHECK(wifi_init_sta());
-
-    remote_log_init(CONFIG_SERVER_BASE_URL);
-    color_init(CONFIG_SERVER_BASE_URL);
-
     ESP_LOGI(TAG, "WiFi ready");
-    heartbeat_start(CONFIG_SERVER_BASE_URL);
-    xTaskCreate(ota_task,   "ota",   8192, NULL, 4, NULL);
-    xTaskCreate(color_task, "color", 4096, NULL, 3, NULL);
+
+    /* Register MQTT subscriptions before connecting — they are re-applied
+       automatically on every (re)connect in device_mqtt. */
+    remote_log_init();
+    ESP_ERROR_CHECK(color_init());
+    heartbeat_start();
+
+    ESP_ERROR_CHECK(device_mqtt_start(CONFIG_MQTT_BROKER_URL));
+
+    xTaskCreate(ota_task, "ota", 8192, NULL, 4, NULL);
 }
