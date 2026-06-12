@@ -2,14 +2,20 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "mqtt_client.h"   /* ESP-IDF MQTT component */
 #include "device_mac.h"
+#include "driver/gpio.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 
 static const char *TAG = "device_mqtt";
+
+#define ACTIVITY_PIN CONFIG_MQTT_ACTIVITY_GPIO_PIN
+#define ACTIVITY_PULSE_US (CONFIG_MQTT_ACTIVITY_PULSE_MS * 1000LL)
 
 #define MAX_SUBS 8
 
@@ -32,6 +38,21 @@ static esp_mqtt_client_handle_t s_client      = NULL;
 static EventGroupHandle_t       s_eg          = NULL;
 static uint32_t                 s_delay_ms    = RECONNECT_DELAY_MIN_MS;
 static char s_status_topic[64];
+
+static esp_timer_handle_t s_activity_timer = NULL;
+
+static void activity_pin_clear(void *arg)
+{
+    gpio_set_level(ACTIVITY_PIN, 0);
+}
+
+static void activity_pulse(void)
+{
+    gpio_set_level(ACTIVITY_PIN, 1);
+    /* Restart the one-shot timer; if already pending, this extends the pulse. */
+    esp_timer_stop(s_activity_timer);
+    esp_timer_start_once(s_activity_timer, ACTIVITY_PULSE_US);
+}
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -106,6 +127,7 @@ static void mqtt_event_handler(void *arg,
             break;
 
         case MQTT_EVENT_DATA:
+            activity_pulse();
             dispatch(ev->topic, ev->topic_len, ev->data, ev->data_len);
             break;
 
@@ -135,6 +157,22 @@ void device_mqtt_subscribe(const char *topic_filter, int qos,
 
 esp_err_t device_mqtt_start(const char *broker_url)
 {
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << ACTIVITY_PIN,
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io);
+    gpio_set_level(ACTIVITY_PIN, 0);
+
+    esp_timer_create_args_t timer_args = {
+        .callback = activity_pin_clear,
+        .name     = "mqtt_act",
+    };
+    esp_timer_create(&timer_args, &s_activity_timer);
+
     char mac[DEVICE_MAC_STR_LEN];
     device_mac_get_str(mac);
     snprintf(s_status_topic, sizeof(s_status_topic), "devices/%s/status", mac);
@@ -168,6 +206,7 @@ esp_err_t device_mqtt_publish(const char *topic, const char *payload,
     if (!s_client) return ESP_ERR_INVALID_STATE;
     int id = esp_mqtt_client_publish(s_client, topic, payload,
                                      strlen(payload), qos, retain);
+    if (id >= 0) activity_pulse();
     return (id >= 0) ? ESP_OK : ESP_FAIL;
 }
 

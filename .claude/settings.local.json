@@ -23,7 +23,12 @@
       "Bash(pip install *)",
       "Bash(grep -r \"esp_app_get_description\" /home/coalman321/esp/esp-idf/components --include=\"*.h\" -l)",
       "Read(//home/coalman321/esp/esp-idf/components/**)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(xargs cat)",
+      "Bash(mkdir -p /home/coalman321/column-project/firmware/ota)"
+    ],
+    "additionalDirectories": [
+      "/home/coalman321/column-project/firmware"
     ]
   }
 }

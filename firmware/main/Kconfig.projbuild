@@ -52,7 +52,7 @@ menu "Column Firmware Configuration"
     config HEARTBEAT_INTERVAL_SECONDS
         int "Heartbeat interval (seconds)"
         default 30
-        range 5 3600
+        range 1 120
         help
             How often the device publishes to devices/{mac}/heartbeat to signal
             it is online.
@@ -64,6 +64,21 @@ menu "Column Firmware Configuration"
         help
             How often to compare the running firmware hash with the server and
             apply an update if they differ.
+
+    config MQTT_ACTIVITY_GPIO_PIN
+        int "MQTT activity indicator GPIO pin"
+        default 15
+        range 0 30
+        help
+            GPIO pin driven high briefly on every MQTT publish or received
+            message. Useful for a status LED or logic analyser trigger.
+
+    config MQTT_ACTIVITY_PULSE_MS
+        int "MQTT activity pulse duration (ms)"
+        default 50
+        range 1 500
+        help
+            How long the activity pin stays high after an MQTT transaction.
 
     config COLOR_GPIO_DATA
         int "GPIO for SK6812 data line"
