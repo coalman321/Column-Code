@@ -37,6 +37,11 @@ static void configure_wakeup_gpio(void)
     ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
 }
 
+void heartbeat_request_sleep(void)
+{
+    s_sleep_requested = true;
+}
+
 static void on_cmd_message(const char *topic, int topic_len,
                            const char *data,  int data_len)
 {

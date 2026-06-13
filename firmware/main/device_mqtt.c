@@ -195,7 +195,7 @@ esp_err_t device_mqtt_start(const char *broker_url)
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID,
                                    mqtt_event_handler, NULL);
 
-    xTaskCreate(reconnect_task, "mqtt_reconnect", 2048, NULL, 4, NULL);
+    xTaskCreate(reconnect_task, "mqtt_reconnect", 4096, NULL, 4, NULL);
 
     return esp_mqtt_client_start(s_client);
 }
@@ -206,7 +206,7 @@ esp_err_t device_mqtt_publish(const char *topic, const char *payload,
     if (!s_client) return ESP_ERR_INVALID_STATE;
     int id = esp_mqtt_client_publish(s_client, topic, payload,
                                      strlen(payload), qos, retain);
-    if (id >= 0) activity_pulse();
+    if (id >= 0 && s_connected) activity_pulse();
     return (id >= 0) ? ESP_OK : ESP_FAIL;
 }
 
