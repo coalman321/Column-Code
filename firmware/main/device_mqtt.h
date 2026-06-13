@@ -21,3 +21,8 @@ esp_err_t device_mqtt_publish(const char *topic, const char *payload,
 
 /* Returns true if the client is currently connected to the broker. */
 bool device_mqtt_is_connected(void);
+
+/* Stop the MQTT client (cancels reconnect timers) before light sleep,
+   then restart it after waking. */
+void device_mqtt_suspend(void);
+void device_mqtt_resume(void);

@@ -70,7 +70,9 @@ static void heartbeat_task(void *arg)
             ESP_LOGI(TAG, "entering light sleep, wake on GPIO %d",
                      CONFIG_WAKEUP_GPIO_PIN);
             color_apply(0, 0, 0, 0);
+            device_mqtt_suspend();
             esp_light_sleep_start();
+            device_mqtt_resume();
             ESP_LOGI(TAG, "woke from light sleep (cause: %d)",
                      (int)esp_sleep_get_wakeup_cause());
         }

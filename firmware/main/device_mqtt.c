@@ -214,3 +214,13 @@ bool device_mqtt_is_connected(void)
 {
     return s_connected;
 }
+
+void device_mqtt_suspend(void)
+{
+    esp_mqtt_client_stop(s_client);
+}
+
+void device_mqtt_resume(void)
+{
+    esp_mqtt_client_start(s_client);
+}
