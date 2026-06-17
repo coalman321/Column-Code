@@ -41,7 +41,10 @@
       "Bash(find /home/coalman321 -name \"column.db\" -type f 2>/dev/null)",
       "Read(//home/coalman321/**)",
       "Bash(curl -s -v http://localhost:8000/clients/)",
-      "Bash(python3 -m py_compile backend/app/presets.py)"
+      "Bash(python3 -m py_compile backend/app/presets.py)",
+      "Bash(python3 -m py_compile backend/app/cycle.py backend/app/main.py)",
+      "Bash(python3 -m py_compile backend/app/cycle.py backend/app/db.py)",
+      "Bash(python3 -m py_compile backend/app/cycle.py)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"

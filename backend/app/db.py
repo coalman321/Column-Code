@@ -70,6 +70,8 @@ def init_db() -> None:
         # Migrate existing tables to add new columns if missing
         if not _column_exists(conn, "clients", "display_name"):
             conn.execute("ALTER TABLE clients ADD COLUMN display_name TEXT")
+        if not _column_exists(conn, "clients", "hue_offset"):
+            conn.execute("ALTER TABLE clients ADD COLUMN hue_offset REAL DEFAULT 0")
 
         conn.commit()
     finally:
@@ -123,6 +125,32 @@ def get_display_name(mac: str) -> str | None:
             (mac,),
         ).fetchone()
         return row["display_name"] if row else None
+    finally:
+        conn.close()
+
+
+def set_hue_offset(mac: str, offset: float) -> None:
+    """Set the hue offset for a device in the color wheel cycle."""
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE clients SET hue_offset = ? WHERE mac = ?",
+            (offset, mac),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_hue_offset(mac: str) -> float:
+    """Get the hue offset for a device (default 0)."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT hue_offset FROM clients WHERE mac = ?",
+            (mac,),
+        ).fetchone()
+        return float(row["hue_offset"]) if row and row["hue_offset"] is not None else 0.0
     finally:
         conn.close()
 

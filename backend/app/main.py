@@ -12,6 +12,7 @@ from app.firmware import router as firmware_router
 from app.logs import router as logs_router
 from app.presets import router as presets_router
 from app.ota import router as ota_router
+from app.cycle import router as cycle_router
 import app.mqtt as mqtt_manager
 
 
@@ -40,6 +41,7 @@ app.include_router(colors_router)
 app.include_router(presets_router)
 app.include_router(firmware_router)
 app.include_router(ota_router)
+app.include_router(cycle_router)
 app.include_router(logs_router)
 
 STATIC_DIR = Path(__file__).parent.parent.parent / "web_app" / "build"

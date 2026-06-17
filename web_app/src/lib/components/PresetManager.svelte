@@ -29,6 +29,11 @@
   let presetName = $state('');
   let deleteConfirm = $state<number | null>(null);
 
+  // Rainbow cycle state
+  let cycleStatus = $state({ cycling: false, current_hue: 0, step_size: 1, brightness: 255 });
+  let cycleStepSize = $state(1);
+  let cycleBrightness = $state(255);
+
   async function fetchPresets() {
     loading = true;
     error = null;
@@ -40,6 +45,73 @@
       error = e instanceof Error ? e.message : 'Failed to fetch presets';
     } finally {
       loading = false;
+    }
+  }
+
+  async function fetchCycleStatus() {
+    try {
+      const res = await fetch('/cycle/status');
+      if (res.ok) {
+        cycleStatus = await res.json();
+        cycleStepSize = cycleStatus.step_size;
+        cycleBrightness = cycleStatus.brightness;
+      }
+    } catch {}
+  }
+
+  async function startCycle() {
+    try {
+      const res = await fetch('/cycle/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_size: cycleStepSize }),
+      });
+      if (res.ok) {
+        cycleStatus = await res.json();
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to start cycle';
+    }
+  }
+
+  async function stopCycle() {
+    try {
+      const res = await fetch('/cycle/stop', { method: 'POST' });
+      if (res.ok) {
+        await fetchCycleStatus();
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to stop cycle';
+    }
+  }
+
+  async function updateStepSize() {
+    try {
+      const res = await fetch('/cycle/step-size', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_size: cycleStepSize }),
+      });
+      if (res.ok) {
+        cycleStatus.step_size = cycleStepSize;
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to update step size';
+    }
+  }
+
+  async function updateBrightness() {
+    try {
+      const res = await fetch('/cycle/brightness', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brightness: Math.round(cycleBrightness) }),
+      });
+      if (res.ok) {
+        cycleStatus.brightness = Math.round(cycleBrightness);
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to update brightness';
     }
   }
 
@@ -102,6 +174,16 @@
 
   onMount(() => {
     fetchPresets();
+    fetchCycleStatus();
+
+    // Poll cycle status every 500ms when cycling
+    const interval = setInterval(() => {
+      if (cycleStatus.cycling) {
+        fetchCycleStatus();
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
   });
 </script>
 
@@ -143,6 +225,51 @@
       </button>
     </div>
   {/if}
+
+  <!-- Rainbow Cycle Mode -->
+  <div class="rainbow-cycle">
+    <div class="cycle-header">
+      <span class="cycle-title">🌈 Rainbow Cycle</span>
+      <button
+        class="cycle-btn"
+        onclick={cycleStatus.cycling ? stopCycle : startCycle}
+        disabled={loading}
+      >
+        {cycleStatus.cycling ? 'Stop' : 'Start'}
+      </button>
+    </div>
+    {#if cycleStatus.cycling}
+      <div class="cycle-info">
+        <div class="hue-display">Hue: {Math.round(cycleStatus.current_hue)}°</div>
+        <div class="step-control">
+          <label>Step Size (°/sec):</label>
+          <input
+            type="range"
+            min="0.1"
+            max="10"
+            step="0.1"
+            bind:value={cycleStepSize}
+            onchange={updateStepSize}
+            class="step-slider"
+          />
+          <span class="step-value">{cycleStepSize.toFixed(1)}</span>
+        </div>
+        <div class="brightness-control">
+          <label>Brightness:</label>
+          <input
+            type="range"
+            min="0"
+            max="255"
+            step="1"
+            bind:value={cycleBrightness}
+            onchange={updateBrightness}
+            class="brightness-slider"
+          />
+          <span class="brightness-value">{Math.round(cycleBrightness)}</span>
+        </div>
+      </div>
+    {/if}
+  </div>
 
   {#if presets.length === 0 && !loading}
     <p class="empty">No presets saved yet</p>
@@ -392,5 +519,103 @@
   .flicker-badge {
     font-size: 0.8rem;
     display: inline-block;
+  }
+
+  .rainbow-cycle {
+    background: linear-gradient(135deg, #1a2a1a 0%, #1a1a2a 100%);
+    border: 1px solid #2a5a3a;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .cycle-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .cycle-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #7cff7c;
+  }
+
+  .cycle-btn {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid #2a8a4a;
+    border-radius: 4px;
+    background: #1a3a2a;
+    color: #6cff6c;
+    cursor: pointer;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .cycle-btn:hover:not(:disabled) {
+    background: #2a4a3a;
+    border-color: #4aaa6a;
+    color: #9cffaa;
+  }
+
+  .cycle-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .cycle-info {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #2a5a3a;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .hue-display {
+    font-size: 0.85rem;
+    color: #9cff9c;
+    text-align: center;
+  }
+
+  .step-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: #7cff7c;
+  }
+
+  .step-slider {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+  }
+
+  .step-value {
+    font-family: monospace;
+    min-width: 2.5rem;
+    text-align: right;
+  }
+
+  .brightness-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: #ffcc7c;
+  }
+
+  .brightness-slider {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+  }
+
+  .brightness-value {
+    font-family: monospace;
+    min-width: 2.5rem;
+    text-align: right;
   }
 </style>
