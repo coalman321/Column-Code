@@ -51,6 +51,14 @@ def init_db() -> None:
                 value TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS battery_status (
+                mac              TEXT PRIMARY KEY,
+                battery_percent  INTEGER NOT NULL,
+                battery_mv       INTEGER NOT NULL,
+                last_updated     TEXT    NOT NULL
+            )
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -188,5 +196,51 @@ def save_global_color(r: int, g: int, b: int, w: int, flicker: bool = False) -> 
             ("current_color", value),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def save_battery_status(mac: str, percent: int, mv: int) -> None:
+    """Save battery status for a device."""
+    now = datetime.now(timezone.utc).isoformat()
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO battery_status (mac, battery_percent, battery_mv, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(mac) DO UPDATE SET
+                battery_percent = excluded.battery_percent,
+                battery_mv = excluded.battery_mv,
+                last_updated = excluded.last_updated
+            """,
+            (mac, percent, mv, now),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_battery_status(mac: str) -> dict | None:
+    """Load battery status for a device."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT mac, battery_percent, battery_mv, last_updated FROM battery_status WHERE mac = ?",
+            (mac,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def load_all_battery_status() -> list[dict]:
+    """Load battery status for all devices."""
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            "SELECT mac, battery_percent, battery_mv, last_updated FROM battery_status"
+        ).fetchall()
+        return [dict(row) for row in rows]
     finally:
         conn.close()

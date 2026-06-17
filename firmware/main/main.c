@@ -9,6 +9,7 @@
 #include "remote_log.h"
 #include "heartbeat.h"
 #include "color.h"
+#include "battery.h"
 #include "device_mqtt.h"
 
 static const char *TAG = "main";
@@ -67,6 +68,7 @@ void app_main(void)
     /* Register MQTT subscriptions before connecting — they are re-applied
        automatically on every (re)connect in device_mqtt. */
     remote_log_init();
+    ESP_ERROR_CHECK(battery_init());
     ESP_ERROR_CHECK(color_init());
     ESP_ERROR_CHECK(ota_init_mqtt(CONFIG_SERVER_BASE_URL));
     heartbeat_start();

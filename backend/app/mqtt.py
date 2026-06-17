@@ -45,7 +45,7 @@ async def _dispatch(message: aiomqtt.Message) -> None:
 
     if subtopic == "heartbeat":
         from app.clients import on_mqtt_heartbeat
-        on_mqtt_heartbeat(mac)
+        on_mqtt_heartbeat(mac, data)
     elif subtopic == "logs":
         from app.logs import on_mqtt_log
         on_mqtt_log(mac, data)

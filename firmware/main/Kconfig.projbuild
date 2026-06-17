@@ -94,4 +94,19 @@ menu "Column Firmware Configuration"
         help
             Number of SK6812 RGBW LEDs in the chain.
 
+    config I2C_SCL_GPIO
+        int "I2C SCL GPIO pin"
+        default 18
+        range 0 30
+        help
+            GPIO pin for I2C SCL (clock) line. Used by MAX17048 battery monitor.
+
+    config I2C_SDA_GPIO
+        int "I2C SDA GPIO pin"
+        default 19
+        range 0 30
+        help
+            GPIO pin for I2C SDA (data) line. Used by MAX17048 battery monitor.
+
 endmenu
+

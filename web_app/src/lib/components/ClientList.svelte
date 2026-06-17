@@ -7,6 +7,8 @@
     mac: string;
     last_seen: string;
     connected: boolean;
+    battery_percent?: number;
+    battery_mv?: number;
   }
 
   let { presets = $bindable<any[]>([]), currentColor = $bindable<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 }) } = $props();
@@ -39,12 +41,28 @@
       clients = await res.json();
       for (const c of clients) {
         if (!colors[c.mac]) fetchColor(c.mac);
+        fetchBattery(c.mac);
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Fetch failed';
     } finally {
       loading = false;
     }
+  }
+
+  async function fetchBattery(mac: string) {
+    try {
+      const res = await fetch(`/clients/battery/${mac}`);
+      if (res.ok) {
+        const data = await res.json();
+        const client = clients.find(c => c.mac === mac);
+        if (client) {
+          client.battery_percent = data.battery_percent;
+          client.battery_mv = data.battery_mv;
+          clients = [...clients];  /* trigger reactivity */
+        }
+      }
+    } catch {}
   }
 
   async function fetchColor(mac: string) {
@@ -232,8 +250,13 @@
         {@const color = colors[client.mac]}
         <li class:online={client.connected} class:offline={!client.connected}>
           <div class="dot"></div>
-          <span class="mac">{client.mac}</span>
-          <span class="time">{timeAgo(client.last_seen)}</span>
+          <div class="left-group">
+            <span class="mac">{client.mac}</span>
+            <span class="battery" title={client.battery_percent !== undefined ? `${client.battery_mv}mV` : 'Battery data unavailable'}>
+              {client.battery_percent !== undefined ? `${client.battery_percent}%` : '—'}
+            </span>
+            <span class="time">{timeAgo(client.last_seen)}</span>
+          </div>
           <button
             class="ota-btn"
             onclick={() => triggerOTA(client.mac)}
@@ -401,10 +424,17 @@
   li.online  .dot { background: #4caf82; box-shadow: 0 0 6px #4caf8288; }
   li.offline .dot { background: #555; }
 
+  .left-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
   .mac {
     font-family: monospace;
     font-size: 0.9rem;
-    flex: 1;
+    flex-shrink: 0;
   }
 
   li.offline .mac { color: #666; }
@@ -413,6 +443,17 @@
     font-size: 0.8rem;
     color: #555;
     white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .battery {
+    font-size: 0.75rem;
+    color: #4caf82;
+    white-space: nowrap;
+    padding: 0.2rem 0.5rem;
+    background: rgba(76, 175, 130, 0.1);
+    border-radius: 3px;
+    flex-shrink: 0;
   }
 
   /* ── sleep button ── */

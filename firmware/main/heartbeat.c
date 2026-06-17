@@ -11,6 +11,7 @@
 #include "device_mac.h"
 #include "device_mqtt.h"
 #include "color.h"
+#include "battery.h"
 
 static const char *TAG = "heartbeat";
 
@@ -63,7 +64,19 @@ static void on_cmd_message(const char *topic, int topic_len,
 static void heartbeat_task(void *arg)
 {
     while (1) {
-        device_mqtt_publish(s_heartbeat_topic, "{}", 1, 0);
+        /* Read battery status and include in heartbeat */
+        BatteryStatus batt = {0};
+        cJSON *root = cJSON_CreateObject();
+
+        if (battery_read(&batt) == ESP_OK) {
+            cJSON_AddNumberToObject(root, "battery_percent", batt.soc);
+            cJSON_AddNumberToObject(root, "battery_mv", batt.voltage_mv);
+        }
+
+        char *json_str = cJSON_PrintUnformatted(root);
+        device_mqtt_publish(s_heartbeat_topic, json_str, 1, 0);
+        free(json_str);
+        cJSON_Delete(root);
 
         if (s_sleep_requested) {
             s_sleep_requested = false;

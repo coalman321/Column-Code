@@ -18,11 +18,20 @@ def load_from_db() -> None:
 
 # ── MQTT callbacks (called from mqtt.py dispatcher) ───────────────────────
 
-def on_mqtt_heartbeat(mac: str) -> None:
+def on_mqtt_heartbeat(mac: str, data: str = "") -> None:
     now = datetime.now(timezone.utc)
     _clients[mac] = now
-    from app.db import save_client
+    from app.db import save_client, save_battery_status
     save_client(mac, now)
+
+    # Parse battery data if present in heartbeat
+    if data:
+        try:
+            payload = json.loads(data)
+            if "battery_percent" in payload and "battery_mv" in payload:
+                save_battery_status(mac, payload["battery_percent"], payload["battery_mv"])
+        except Exception:
+            pass
 
 
 async def on_mqtt_status(mac: str, data: str) -> None:
@@ -46,6 +55,16 @@ async def on_mqtt_status(mac: str, data: str) -> None:
 
 
 # ── HTTP endpoints (frontend-facing) ─────────────────────────────────────
+
+@router.get("/battery/{mac}")
+def get_battery(mac: str):
+    """Get battery status for a device."""
+    from app.db import load_battery_status
+    status = load_battery_status(mac.upper())
+    if not status:
+        raise HTTPException(status_code=404, detail="Battery status not found")
+    return status
+
 
 @router.post("/sleep/{mac}", status_code=204)
 async def request_sleep(mac: str) -> None:

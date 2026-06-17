@@ -28,7 +28,9 @@
       "Bash(mkdir -p /home/coalman321/column-project/firmware/ota)",
       "Bash(python3 -m py_compile app/presets.py app/db.py app/main.py)",
       "Bash(git add *)",
-      "Bash(idf.py build *)"
+      "Bash(idf.py build *)",
+      "Bash(docker-compose down *)",
+      "Bash(docker-compose up *)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"
