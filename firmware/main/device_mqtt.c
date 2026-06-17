@@ -223,4 +223,6 @@ void device_mqtt_suspend(void)
 void device_mqtt_resume(void)
 {
     esp_mqtt_client_start(s_client);
+    /* After extended sleep, give MQTT client time to reconnect to broker */
+    vTaskDelay(pdMS_TO_TICKS(2000));
 }
