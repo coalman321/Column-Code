@@ -54,7 +54,7 @@
       const res = await fetch('/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, r: color.r, g: color.g, b: color.b, w: color.w }),
+        body: JSON.stringify({ name, r: color.r, g: color.g, b: color.b, w: color.w, flicker: color.flicker ?? false }),
       });
       if (!res.ok) {
         const data = await res.json();

@@ -7,8 +7,11 @@
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
 #include "cJSON.h"
+#include "device_mqtt.h"
+#include "device_mac.h"
 
 static const char *TAG = "ota";
+static char s_server_base_url[128] = {0};
 
 /* Accumulate the hash endpoint response (small JSON, 256 B is plenty). */
 static char  s_resp_buf[256];
@@ -124,4 +127,60 @@ esp_err_t ota_check_and_update(const char *server_base_url)
         ESP_LOGE(TAG, "OTA failed: %s", esp_err_to_name(err));
     }
     return err;
+}
+
+/* ── MQTT OTA trigger ───────────────────────────────────────────────────── */
+
+static void on_ota_message(const char *topic, int topic_len,
+                           const char *data,  int data_len)
+{
+    char buf[64];
+    int copy = data_len < (int)sizeof(buf) - 1 ? data_len : (int)sizeof(buf) - 1;
+    memcpy(buf, data, copy);
+    buf[copy] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        ESP_LOGE(TAG, "OTA request JSON parse failed");
+        return;
+    }
+
+    cJSON *trigger = cJSON_GetObjectItem(root, "trigger");
+    if (cJSON_IsBool(trigger) && trigger->valueint) {
+        ESP_LOGI(TAG, "OTA update triggered via MQTT");
+        cJSON_Delete(root);
+        ota_trigger_update();
+        return;
+    }
+
+    cJSON_Delete(root);
+}
+
+esp_err_t ota_init_mqtt(const char *server_base_url)
+{
+    if (!server_base_url || strlen(server_base_url) >= sizeof(s_server_base_url)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    strncpy(s_server_base_url, server_base_url, sizeof(s_server_base_url) - 1);
+    s_server_base_url[sizeof(s_server_base_url) - 1] = '\0';
+
+    static char s_ota_topic[64];
+    char mac[DEVICE_MAC_STR_LEN];
+    device_mac_get_str(mac);
+    snprintf(s_ota_topic, sizeof(s_ota_topic), "devices/%s/ota", mac);
+    device_mqtt_subscribe(s_ota_topic, 1, on_ota_message);
+
+    ESP_LOGI(TAG, "MQTT OTA subscription registered: %s", s_ota_topic);
+    return ESP_OK;
+}
+
+esp_err_t ota_trigger_update(void)
+{
+    if (s_server_base_url[0] == '\0') {
+        ESP_LOGE(TAG, "server_base_url not configured");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    return ota_check_and_update(s_server_base_url);
 }

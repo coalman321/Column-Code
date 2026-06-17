@@ -68,6 +68,7 @@ void app_main(void)
        automatically on every (re)connect in device_mqtt. */
     remote_log_init();
     ESP_ERROR_CHECK(color_init());
+    ESP_ERROR_CHECK(ota_init_mqtt(CONFIG_SERVER_BASE_URL));
     heartbeat_start();
 
     ESP_ERROR_CHECK(device_mqtt_start(CONFIG_MQTT_BROKER_URL));

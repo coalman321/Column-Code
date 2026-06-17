@@ -10,7 +10,7 @@
   let currentColor = $state<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 });
 
   function applyPresetToAll(preset: any) {
-    const color = { r: preset.r, g: preset.g, b: preset.b, w: preset.w };
+    const color = { r: preset.r, g: preset.g, b: preset.b, w: preset.w, flicker: preset.flicker };
     currentColor = color;
     clientList?.applyPresetToAll(color);
   }

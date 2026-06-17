@@ -24,6 +24,7 @@ def init_db() -> None:
                 g            INTEGER NOT NULL DEFAULT 0,
                 b            INTEGER NOT NULL DEFAULT 0,
                 w            INTEGER NOT NULL DEFAULT 0,
+                flicker      INTEGER NOT NULL DEFAULT 0,
                 last_updated TEXT    NOT NULL
             )
         """)
@@ -35,12 +36,13 @@ def init_db() -> None:
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS presets (
-                id   INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT    NOT NULL UNIQUE,
-                r    INTEGER NOT NULL,
-                g    INTEGER NOT NULL,
-                b    INTEGER NOT NULL,
-                w    INTEGER NOT NULL
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                name    TEXT    NOT NULL UNIQUE,
+                r       INTEGER NOT NULL,
+                g       INTEGER NOT NULL,
+                b       INTEGER NOT NULL,
+                w       INTEGER NOT NULL,
+                flicker INTEGER NOT NULL DEFAULT 0
             )
         """)
         conn.commit()
@@ -86,7 +88,7 @@ def load_all_colors() -> list[dict]:
     conn = _connect()
     try:
         rows = conn.execute(
-            "SELECT mac, r, g, b, w, last_updated FROM colors"
+            "SELECT mac, r, g, b, w, flicker, last_updated FROM colors"
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -102,22 +104,23 @@ def delete_color(mac: str) -> None:
         conn.close()
 
 
-def save_color(mac: str, r: int, g: int, b: int, w: int) -> None:
+def save_color(mac: str, r: int, g: int, b: int, w: int, flicker: bool = False) -> None:
     now = datetime.now(timezone.utc).isoformat()
     conn = _connect()
     try:
         conn.execute(
             """
-            INSERT INTO colors (mac, r, g, b, w, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO colors (mac, r, g, b, w, flicker, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(mac) DO UPDATE SET
                 r            = excluded.r,
                 g            = excluded.g,
                 b            = excluded.b,
                 w            = excluded.w,
+                flicker      = excluded.flicker,
                 last_updated = excluded.last_updated
             """,
-            (mac, r, g, b, w, now),
+            (mac, r, g, b, w, 1 if flicker else 0, now),
         )
         conn.commit()
     finally:
@@ -127,18 +130,18 @@ def save_color(mac: str, r: int, g: int, b: int, w: int) -> None:
 def load_all_presets() -> list[dict]:
     conn = _connect()
     try:
-        rows = conn.execute("SELECT id, name, r, g, b, w FROM presets ORDER BY name").fetchall()
+        rows = conn.execute("SELECT id, name, r, g, b, w, flicker FROM presets ORDER BY name").fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()
 
 
-def save_preset(name: str, r: int, g: int, b: int, w: int) -> int:
+def save_preset(name: str, r: int, g: int, b: int, w: int, flicker: bool = False) -> int:
     conn = _connect()
     try:
         cursor = conn.execute(
-            "INSERT INTO presets (name, r, g, b, w) VALUES (?, ?, ?, ?, ?)",
-            (name, r, g, b, w),
+            "INSERT INTO presets (name, r, g, b, w, flicker) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, r, g, b, w, 1 if flicker else 0),
         )
         conn.commit()
         return cursor.lastrowid

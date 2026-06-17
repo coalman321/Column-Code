@@ -24,6 +24,7 @@
   let sleepPending    = $state<Record<string, boolean>>({});
   let deletePending   = $state<Record<string, boolean>>({});
   let sleepAllPending = $state(false);
+  let otaPending      = $state<Record<string, boolean>>({});
   let openAll         = $state(false);
   let allSwatchEl     = $state<HTMLElement | null>(null);
   let allPopoverStyle = $state('');
@@ -104,6 +105,19 @@
       );
     } finally {
       sleepAllPending = false;
+    }
+  }
+
+  async function triggerOTA(mac: string) {
+    if (!confirm(`Trigger OTA re-flash on ${mac}?`)) return;
+    otaPending[mac] = true;
+    try {
+      const res = await fetch(`/ota/${mac}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error('OTA trigger failed:', e);
+    } finally {
+      otaPending[mac] = false;
     }
   }
 
@@ -220,6 +234,13 @@
           <div class="dot"></div>
           <span class="mac">{client.mac}</span>
           <span class="time">{timeAgo(client.last_seen)}</span>
+          <button
+            class="ota-btn"
+            onclick={() => triggerOTA(client.mac)}
+            disabled={otaPending[client.mac]}
+            aria-label="OTA {client.mac}"
+            title="Trigger OTA re-flash"
+          >{otaPending[client.mac] ? '…' : 'OTA'}</button>
           <button
             class="sleep-btn"
             onclick={() => requestSleep(client.mac)}
@@ -393,6 +414,27 @@
     color: #555;
     white-space: nowrap;
   }
+
+  /* ── sleep button ── */
+  /* ── OTA button ── */
+  .ota-btn {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    border: 1px solid #3a3a2a;
+    border-radius: 4px;
+    background: #1e2410;
+    color: #ccaa66;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .ota-btn:hover:not(:disabled) {
+    background: #2a3418;
+    border-color: #aa8844;
+    color: #eecc88;
+  }
+
+  .ota-btn:disabled { opacity: 0.35; cursor: default; }
 
   /* ── sleep button ── */
   .sleep-btn {

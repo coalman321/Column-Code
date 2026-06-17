@@ -28,6 +28,7 @@ class Preset(BaseModel):
     g: int = Field(0, ge=0, le=255)
     b: int = Field(0, ge=0, le=255)
     w: int = Field(0, ge=0, le=255)
+    flicker: bool = Field(False)
 
 
 class CreatePresetRequest(BaseModel):
@@ -36,6 +37,7 @@ class CreatePresetRequest(BaseModel):
     g: int = Field(0, ge=0, le=255)
     b: int = Field(0, ge=0, le=255)
     w: int = Field(0, ge=0, le=255)
+    flicker: bool = Field(False)
 
 
 @router.get("")
@@ -47,7 +49,7 @@ def list_presets() -> list[Preset]:
 def create_preset(req: CreatePresetRequest) -> Preset:
     from app.db import save_preset
     try:
-        preset_id = save_preset(req.name, req.r, req.g, req.b, req.w)
+        preset_id = save_preset(req.name, req.r, req.g, req.b, req.w, req.flicker)
     except Exception:
         raise HTTPException(status_code=400, detail="Preset name already exists")
 
@@ -58,6 +60,7 @@ def create_preset(req: CreatePresetRequest) -> Preset:
         "g": req.g,
         "b": req.b,
         "w": req.w,
+        "flicker": req.flicker,
     }
     _store[preset_id] = preset
     return Preset(**preset)

@@ -25,7 +25,10 @@
       "Read(//home/coalman321/esp/esp-idf/components/**)",
       "Bash(docker compose *)",
       "Bash(xargs cat)",
-      "Bash(mkdir -p /home/coalman321/column-project/firmware/ota)"
+      "Bash(mkdir -p /home/coalman321/column-project/firmware/ota)",
+      "Bash(python3 -m py_compile app/presets.py app/db.py app/main.py)",
+      "Bash(git add *)",
+      "Bash(idf.py build *)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"

@@ -4,6 +4,7 @@
     g: number;
     b: number;
     w: number;
+    flicker?: boolean;
   }
 
   interface Props {
@@ -11,16 +12,17 @@
     onchange?: (color: RGBWColor) => void;
   }
 
-  let { value = $bindable({ r: 255, g: 0, b: 0, w: 0 }), onchange }: Props = $props();
+  let { value = $bindable({ r: 255, g: 0, b: 0, w: 0, flicker: false }), onchange }: Props = $props();
 
   let r = $state(value.r);
   let g = $state(value.g);
   let b = $state(value.b);
   let w = $state(value.w);
+  let flicker = $state(value.flicker ?? false);
 
   /* Sync internal state → bound value whenever any channel changes. */
   $effect(() => {
-    const v = { r, g, b, w };
+    const v = { r, g, b, w, flicker };
     value = v;
     onchange?.(v);
   });
@@ -113,6 +115,16 @@
       </div>
     {/each}
   </div>
+
+  <!-- Flicker toggle -->
+  <label class="flicker-label">
+    <input
+      type="checkbox"
+      bind:checked={flicker}
+      aria-label="Enable candlelight flicker"
+    />
+    <span>Candlelight Flicker</span>
+  </label>
 </div>
 
 <style>
@@ -230,5 +242,27 @@
   input[type='number']:focus {
     outline: none;
     border-color: #444;
+  }
+
+  .flicker-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #ccc;
+    padding: 0.5rem 0;
+    border-top: 1px solid #2e2e2e;
+    margin-top: 0.5rem;
+  }
+
+  .flicker-label input[type='checkbox'] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+  }
+
+  .flicker-label:hover {
+    color: #fff;
   }
 </style>
