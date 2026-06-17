@@ -121,7 +121,7 @@
     <p class="error">{error}</p>
   {/if}
 
-  {#if showForm}
+  {#if showForm && currentColor}
     <div class="form">
       <input
         type="text"
@@ -131,45 +131,54 @@
         disabled={loading}
         aria-label="Preset name"
       />
-      {#if currentColor}
-        <button
-          class="save-btn"
-          onclick={async () => {
-            await saveCurrentPreset(currentColor);
-          }}
-          disabled={loading}
-        >
-          Save Color
-        </button>
-      {/if}
-      {#if children}
-        {@render children()}
-      {/if}
+      <button
+        class="save-btn"
+        onclick={async () => {
+          await saveCurrentPreset(currentColor);
+        }}
+        disabled={loading}
+      >
+        Save Color
+      </button>
     </div>
   {/if}
 
-  {#if presets.length === 0 && !loading && !showForm}
+  {#if presets.length === 0 && !loading}
     <p class="empty">No presets saved yet</p>
-  {:else}
+  {:else if presets.length > 0}
     <ul class="preset-list">
       {#each presets as preset}
         <li class="preset-item">
-          <button
-            class="swatch"
+          <div
+            class="preset-tile"
             style={`--bg: ${colorBg(preset)}`}
+            role="button"
             onclick={() => onPresetSelected?.(preset)}
             aria-label={preset.name}
-            title="Apply preset"
-          ></button>
-          <span class="name">{preset.name}</span>
-          <button
-            class="delete-btn"
-            onclick={() => deletePreset(preset.id)}
-            disabled={loading}
-            aria-label="Delete {preset.name}"
+            title="Apply {preset.name}"
+            tabindex="0"
+            onkeydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onPresetSelected?.(preset);
+              }
+            }}
           >
-            {deleteConfirm === preset.id ? 'Confirm?' : '✕'}
-          </button>
+            <div class="tile-content">
+              <div class="tile-name">{preset.name}</div>
+              <button
+                class="tile-delete"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  deletePreset(preset.id);
+                }}
+                disabled={loading}
+                aria-label="Delete {preset.name}"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
         </li>
       {/each}
     </ul>
@@ -268,67 +277,90 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
   }
 
   .preset-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    border-radius: 4px;
-    background: #0a0a0a;
-    border: 1px solid #1a1a1a;
+    display: contents;
   }
 
-  .preset-item:hover {
-    background: #151515;
-  }
-
-  .swatch {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border-radius: 3px;
-    border: 1px solid #333;
+  .preset-tile {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    border: 2px solid #2a2a2a;
     background: var(--bg, #1a1a1a);
     cursor: pointer;
-    flex-shrink: 0;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
 
-  .swatch:hover {
-    border-color: #555;
+  .preset-tile:hover {
+    border-color: #4a4a4a;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
   }
 
-  .name {
-    flex: 1;
-    font-size: 0.85rem;
+  .preset-tile:active {
+    border-color: #666;
+  }
+
+  .tile-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 100%;
+  }
+
+  .tile-name {
+    font-size: 0.7rem;
     color: #ccc;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.2;
+    max-width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .delete-btn {
-    padding: 0.15rem 0.35rem;
-    border: 1px solid #3a2a2a;
+  .tile-delete {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
     border-radius: 3px;
-    background: transparent;
-    color: #999;
+    background: rgba(0, 0, 0, 0.6);
+    color: #ff6666;
     cursor: pointer;
     font-size: 0.75rem;
-    flex-shrink: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
   }
 
-  .delete-btn:hover:not(:disabled) {
-    background: #2a1a1a;
-    color: #ee8888;
-    border-color: #aa4444;
+  .preset-tile:hover .tile-delete {
+    display: flex;
   }
 
-  .delete-btn:disabled {
+  .tile-delete:hover:not(:disabled) {
+    background: rgba(128, 20, 20, 0.8);
+  }
+
+  .tile-delete:disabled {
     opacity: 0.5;
   }
 

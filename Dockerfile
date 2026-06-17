@@ -4,6 +4,7 @@ WORKDIR /build
 COPY web_app/package.json web_app/package-lock.json ./
 RUN npm ci
 COPY web_app/ ./
+RUN rm -rf build .svelte-kit node_modules/.vite
 RUN npm run build
 
 # ── Stage 2: Python backend + built frontend ──────────────────────────────

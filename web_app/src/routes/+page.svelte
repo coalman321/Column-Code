@@ -6,7 +6,14 @@
 
   let presets = $state<any[]>([]);
   let presetManager = $state<any>(null);
+  let clientList = $state<any>(null);
   let currentColor = $state<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 });
+
+  function applyPresetToAll(preset: any) {
+    const color = { r: preset.r, g: preset.g, b: preset.b, w: preset.w };
+    currentColor = color;
+    clientList?.applyPresetToAll(color);
+  }
 </script>
 
 <main>
@@ -14,12 +21,13 @@
     <PresetManager
       bind:this={presetManager}
       bind:presets
-      currentColor={currentColor}
+      {currentColor}
+      onPresetSelected={applyPresetToAll}
     />
   </section>
 
   <section>
-    <ClientList bind:currentColor bind:presets />
+    <ClientList bind:this={clientList} bind:currentColor bind:presets />
   </section>
 
   <section>
@@ -44,8 +52,9 @@
     padding: 1.25rem 1.5rem;
   }
 
-  :global(.presets-section) {
+  section.presets-section {
     background: #0a1a1a;
-    border: 1px solid #1a3a3a;
+    border: 2px solid #2a5a5a;
+    padding-top: 1rem;
   }
 </style>

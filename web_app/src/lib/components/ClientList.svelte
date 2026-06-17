@@ -115,14 +115,8 @@
     }
   }
 
-  function applyPresetToAll(preset: any) {
-    putAllColor({ r: preset.r, g: preset.g, b: preset.b, w: preset.w });
-  }
-
-  function applyPresetToDevice(mac: string, preset: any) {
-    const color = { r: preset.r, g: preset.g, b: preset.b, w: preset.w };
-    colors[mac] = color;
-    putColor(mac, color);
+  export function applyPresetToAll(color: RGBWColor) {
+    putAllColor(color);
   }
 
   function openAllPicker(e: MouseEvent) {
