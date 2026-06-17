@@ -262,6 +262,14 @@ esp_err_t color_apply(uint8_t r, uint8_t g, uint8_t b, uint8_t w, bool flicker)
     return ESP_OK;
 }
 
+void color_get(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *w)
+{
+    if (r) *r = s_color_r;
+    if (g) *g = s_color_g;
+    if (b) *b = s_color_b;
+    if (w) *w = s_color_w;
+}
+
 void color_disable_flicker(void)
 {
     s_flicker_enabled = false;

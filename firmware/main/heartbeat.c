@@ -94,6 +94,11 @@ static void heartbeat_task(void *arg)
         if (s_blink_requested) {
             s_blink_requested = false;
             ESP_LOGI(TAG, "blinking green for 5 seconds");
+
+            /* Save current color */
+            uint8_t saved_r, saved_g, saved_b, saved_w;
+            color_get(&saved_r, &saved_g, &saved_b, &saved_w);
+
             uint32_t blink_end = esp_timer_get_time() / 1000 + 5000;  /* 5 seconds from now */
             while (esp_timer_get_time() / 1000 < blink_end) {
                 color_apply(0, 255, 0, 0, false);  /* Green ON */
@@ -101,7 +106,10 @@ static void heartbeat_task(void *arg)
                 color_apply(0, 0, 0, 0, false);    /* OFF */
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
-            color_apply(0, 0, 0, 0, false);  /* Ensure OFF at end */
+
+            /* Restore original color */
+            color_apply(saved_r, saved_g, saved_b, saved_w, false);
+            ESP_LOGI(TAG, "blink complete, restored color R=%u G=%u B=%u W=%u", saved_r, saved_g, saved_b, saved_w);
         }
 
         if (s_sleep_requested) {

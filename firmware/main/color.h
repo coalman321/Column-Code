@@ -12,5 +12,8 @@ esp_err_t color_init(void);
    If flicker is true, the brightness will oscillate to simulate candlelight. */
 esp_err_t color_apply(uint8_t r, uint8_t g, uint8_t b, uint8_t w, bool flicker);
 
+/* Get the current color. */
+void color_get(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *w);
+
 /* Temporarily disable flicker (useful during OTA updates). */
 void color_disable_flicker(void);
