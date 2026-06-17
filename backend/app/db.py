@@ -14,6 +14,12 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """Check if a column exists in a table."""
+    cursor = conn.execute(f"PRAGMA table_info({table})")
+    return any(row[1] == column for row in cursor.fetchall())
+
+
 def init_db() -> None:
     conn = _connect()
     try:
@@ -30,8 +36,9 @@ def init_db() -> None:
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS clients (
-                mac       TEXT PRIMARY KEY,
-                last_seen TEXT NOT NULL
+                mac          TEXT PRIMARY KEY,
+                display_name TEXT,
+                last_seen    TEXT NOT NULL
             )
         """)
         conn.execute("""
@@ -59,6 +66,11 @@ def init_db() -> None:
                 last_updated     TEXT    NOT NULL
             )
         """)
+
+        # Migrate existing tables to add new columns if missing
+        if not _column_exists(conn, "clients", "display_name"):
+            conn.execute("ALTER TABLE clients ADD COLUMN display_name TEXT")
+
         conn.commit()
     finally:
         conn.close()
@@ -67,7 +79,7 @@ def init_db() -> None:
 def load_all_clients() -> list[dict]:
     conn = _connect()
     try:
-        rows = conn.execute("SELECT mac, last_seen FROM clients").fetchall()
+        rows = conn.execute("SELECT mac, display_name, last_seen FROM clients").fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()
@@ -85,6 +97,32 @@ def save_client(mac: str, last_seen: datetime) -> None:
             (mac, last_seen.isoformat()),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def set_display_name(mac: str, display_name: str | None) -> None:
+    """Set or clear the display name for a device."""
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE clients SET display_name = ? WHERE mac = ?",
+            (display_name, mac),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_display_name(mac: str) -> str | None:
+    """Get the display name for a device."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT display_name FROM clients WHERE mac = ?",
+            (mac,),
+        ).fetchone()
+        return row["display_name"] if row else None
     finally:
         conn.close()
 

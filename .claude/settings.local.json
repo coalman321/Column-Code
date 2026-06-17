@@ -30,7 +30,17 @@
       "Bash(git add *)",
       "Bash(idf.py build *)",
       "Bash(docker-compose down *)",
-      "Bash(docker-compose up *)"
+      "Bash(docker-compose up *)",
+      "Bash(python3 -m py_compile backend/app/db.py)",
+      "Bash(python3 -m py_compile backend/app/clients.py)",
+      "Bash(curl -s http://localhost:8000/clients/)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X PUT http://localhost:8000/clients/name/58:E6:C5:FF:FE:F5 -H 'Content-Type: application/json' -d '{\"name\":\"TestDevice\"}')",
+      "Bash(curl -s -X PUT http://localhost:8000/clients/name/58E6C5FFFEF5 -H 'Content-Type: application/json' -d '{\"name\":\"TestDevice\"}')",
+      "Bash(python3)",
+      "Bash(find /home/coalman321 -name \"column.db\" -type f 2>/dev/null)",
+      "Read(//home/coalman321/**)",
+      "Bash(curl -s -v http://localhost:8000/clients/)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"

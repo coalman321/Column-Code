@@ -66,6 +66,27 @@ def get_battery(mac: str):
     return status
 
 
+@router.get("/name/{mac}")
+def get_display_name(mac: str):
+    """Get the display name for a device."""
+    from app.db import get_display_name
+    mac = mac.upper()
+    name = get_display_name(mac)
+    return {"mac": mac, "display_name": name}
+
+
+@router.put("/name/{mac}")
+def set_display_name(mac: str, body: dict):
+    """Set or clear the display name for a device."""
+    from app.db import set_display_name
+    mac = mac.upper()
+    if mac not in _clients:
+        raise HTTPException(status_code=404, detail="Unknown client")
+    name = body.get("name")
+    set_display_name(mac, name)
+    return {"mac": mac, "display_name": name}
+
+
 @router.post("/sleep/{mac}", status_code=204)
 async def request_sleep(mac: str) -> None:
     mac = mac.upper()
@@ -89,13 +110,59 @@ def delete_client(mac: str) -> None:
 
 
 @router.get("/")
+@router.get("")
 def list_clients():
+    """List all devices (lightweight - just display name and connection status)."""
+    from app.db import get_display_name
     now = datetime.now(timezone.utc)
-    return [
-        {
-            "mac":       mac,
-            "last_seen": ts.isoformat(),
+    devices = []
+    for mac, ts in sorted(_clients.items()):
+        display_name = get_display_name(mac)
+        devices.append({
+            "name": display_name or mac,  # use display_name if set, otherwise MAC
             "connected": (now - ts) < OFFLINE_AFTER,
-        }
-        for mac, ts in sorted(_clients.items())
-    ]
+        })
+    return devices
+
+
+def _find_mac_by_name(name: str) -> str | None:
+    """Find MAC by display_name or return MAC if exact match."""
+    from app.db import get_display_name
+    name_upper = name.upper()
+
+    # Check if it's a direct MAC match
+    if name_upper in _clients:
+        return name_upper
+
+    # Check if it's a display_name match
+    for mac in _clients:
+        if get_display_name(mac) and get_display_name(mac).lower() == name.lower():
+            return mac
+
+    return None
+
+
+@router.get("/{name}")
+def get_device_info(name: str):
+    """Get full device info by display_name or MAC."""
+    from app.db import get_display_name, load_battery_status
+    from app.colors import get_color
+
+    mac = _find_mac_by_name(name)
+    if not mac:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    now = datetime.now(timezone.utc)
+    ts = _clients[mac]
+    batt = load_battery_status(mac)
+    color = get_color(mac)
+
+    return {
+        "mac": mac,
+        "display_name": get_display_name(mac),
+        "connected": (now - ts) < OFFLINE_AFTER,
+        "last_seen": ts.isoformat(),
+        "battery_percent": batt["battery_percent"] if batt else None,
+        "battery_mv": batt["battery_mv"] if batt else None,
+        "color": color,
+    }

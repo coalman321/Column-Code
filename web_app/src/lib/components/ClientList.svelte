@@ -4,11 +4,14 @@
   import type { RGBWColor } from './ColorPicker.svelte';
 
   interface Client {
-    mac: string;
-    last_seen: string;
+    name: string;  /* display_name or MAC */
+    mac?: string;
+    display_name?: string | null;
+    last_seen?: string;
     connected: boolean;
-    battery_percent?: number;
-    battery_mv?: number;
+    battery_percent?: number | null;
+    battery_mv?: number | null;
+    color?: RGBWColor;
   }
 
   let { presets = $bindable<any[]>([]), currentColor = $bindable<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 }) } = $props();
@@ -31,6 +34,9 @@
   let allSwatchEl     = $state<HTMLElement | null>(null);
   let allPopoverStyle = $state('');
   let presetOpen      = $state<string | null>(null);
+  let editingName     = $state<string | null>(null);
+  let editingValue    = $state('');
+  let renamePending   = $state<Record<string, boolean>>({});
 
   async function fetchClients() {
     loading = true;
@@ -39,9 +45,9 @@
       const res = await fetch('/clients/');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       clients = await res.json();
+      // Fetch detailed info for each client
       for (const c of clients) {
-        if (!colors[c.mac]) fetchColor(c.mac);
-        fetchBattery(c.mac);
+        fetchDeviceInfo(c.name);
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Fetch failed';
@@ -50,29 +56,25 @@
     }
   }
 
-  async function fetchBattery(mac: string) {
+  async function fetchDeviceInfo(name: string) {
     try {
-      const res = await fetch(`/clients/battery/${mac}`);
+      const res = await fetch(`/clients/${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
-        const client = clients.find(c => c.mac === mac);
+        const client = clients.find(c => c.name === name);
         if (client) {
+          client.mac = data.mac;
+          client.display_name = data.display_name;
+          client.last_seen = data.last_seen;
           client.battery_percent = data.battery_percent;
           client.battery_mv = data.battery_mv;
-          clients = [...clients];  /* trigger reactivity */
+          if (data.color) {
+            colors[data.mac] = data.color;
+          }
+          clients = [...clients];
         }
       }
     } catch {}
-  }
-
-  async function fetchColor(mac: string) {
-    try {
-      const res = await fetch(`/colors/${mac}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      colors[mac] = await res.json();
-    } catch {
-      colors[mac] = { r: 0, g: 0, b: 0, w: 0 };
-    }
   }
 
   function putColor(mac: string, color: RGBWColor) {
@@ -88,29 +90,35 @@
     }, 150);
   }
 
-  async function requestSleep(mac: string) {
-    sleepPending = { ...sleepPending, [mac]: true };
+  async function requestSleep(name: string) {
+    const client = clients.find(c => c.name === name);
+    if (!client?.mac) return;
+    sleepPending = { ...sleepPending, [name]: true };
     try {
-      await fetch(`/clients/sleep/${mac}`, { method: 'POST' });
+      await fetch(`/clients/sleep/${client.mac}`, { method: 'POST' });
     } catch { /* ignore */ } finally {
-      sleepPending = { ...sleepPending, [mac]: false };
+      sleepPending = { ...sleepPending, [name]: false };
     }
   }
 
-  async function deleteClient(mac: string, connected: boolean) {
-    const label = connected ? `⚠ ${mac} is still online. Remove anyway?` : `Remove ${mac}?`;
+  async function deleteClient(name: string, connected: boolean) {
+    const client = clients.find(c => c.name === name);
+    if (!client?.mac) return;
+    const label = connected ? `⚠ ${name} is still online. Remove anyway?` : `Remove ${name}?`;
     if (!confirm(label)) return;
-    deletePending = { ...deletePending, [mac]: true };
+    deletePending = { ...deletePending, [name]: true };
     try {
-      const res = await fetch(`/clients/${mac}`, { method: 'DELETE' });
+      const res = await fetch(`/clients/${client.mac}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      clients = clients.filter(c => c.mac !== mac);
-      const { [mac]: _, ...rest } = colors;
-      colors = rest;
+      clients = clients.filter(c => c.name !== name);
+      if (client.mac) {
+        const { [client.mac]: _, ...rest } = colors;
+        colors = rest;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Delete failed';
     } finally {
-      deletePending = { ...deletePending, [mac]: false };
+      deletePending = { ...deletePending, [name]: false };
     }
   }
 
@@ -119,31 +127,72 @@
     sleepAllPending = true;
     try {
       await Promise.allSettled(
-        clients.filter(c => c.connected).map(c => fetch(`/clients/sleep/${c.mac}`, { method: 'POST' }))
+        clients.filter(c => c.connected && c.mac).map(c => fetch(`/clients/sleep/${c.mac!}`, { method: 'POST' }))
       );
     } finally {
       sleepAllPending = false;
     }
   }
 
-  async function triggerOTA(mac: string) {
-    if (!confirm(`Trigger OTA re-flash on ${mac}?`)) return;
-    otaPending[mac] = true;
+  async function triggerOTA(name: string) {
+    const client = clients.find(c => c.name === name);
+    if (!client?.mac) return;
+    if (!confirm(`Trigger OTA re-flash on ${name}?`)) return;
+    otaPending[name] = true;
     try {
-      const res = await fetch(`/ota/${mac}`, { method: 'POST' });
+      const res = await fetch(`/ota/${client.mac}`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
       console.error('OTA trigger failed:', e);
     } finally {
-      otaPending[mac] = false;
+      otaPending[name] = false;
     }
+  }
+
+  function startEditName(name: string, currentName?: string) {
+    editingName = name;
+    editingValue = currentName || '';
+  }
+
+  async function saveName(name: string) {
+    if (editingName !== name) return;
+    const client = clients.find(c => c.name === name);
+    if (!client?.mac) return;
+    renamePending = { ...renamePending, [name]: true };
+    try {
+      const res = await fetch(`/clients/name/${client.mac}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingValue || null }),
+      });
+      if (res.ok) {
+        client.display_name = editingValue || null;
+        // Update the name to reflect the new display name
+        if (editingValue) {
+          client.name = editingValue;
+        }
+        clients = [...clients];
+        editingName = null;
+      }
+    } catch (e) {
+      console.error('Rename failed:', e);
+    } finally {
+      renamePending = { ...renamePending, [name]: false };
+    }
+  }
+
+  function cancelEditName() {
+    editingName = null;
+    editingValue = '';
   }
 
   function putAllColor(color: RGBWColor) {
     currentColor = color;
     for (const c of clients) {
-      colors[c.mac] = color;
-      putColor(c.mac, color);
+      if (c.mac) {
+        colors[c.mac] = color;
+        putColor(c.mac, color);
+      }
     }
   }
 
@@ -247,37 +296,68 @@
   {:else}
     <ul>
       {#each clients as client}
-        {@const color = colors[client.mac]}
+        {@const color = client.mac ? colors[client.mac] : undefined}
         <li class:online={client.connected} class:offline={!client.connected}>
           <div class="dot"></div>
           <div class="left-group">
-            <span class="mac">{client.mac}</span>
-            <span class="battery" title={client.battery_percent !== undefined ? `${client.battery_mv}mV` : 'Battery data unavailable'}>
-              {client.battery_percent !== undefined ? `${client.battery_percent}%` : '—'}
+            {#if editingName === client.name}
+              <input
+                type="text"
+                class="name-input"
+                bind:value={editingValue}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') saveName(client.name);
+                  if (e.key === 'Escape') cancelEditName();
+                }}
+              />
+              <button
+                class="name-save-btn"
+                onclick={() => saveName(client.name)}
+                disabled={renamePending[client.name]}
+              >
+                {renamePending[client.name] ? '…' : '✓'}
+              </button>
+              <button class="name-cancel-btn" onclick={cancelEditName}>✕</button>
+            {:else}
+              <button
+                class="name-btn"
+                title="Click to rename"
+                onclick={() => startEditName(client.name, client.display_name || '')}
+              >
+                <div class="name-display">
+                  {client.display_name || client.name}
+                </div>
+                {#if client.display_name}
+                  <div class="name-mac">{client.mac || client.name}</div>
+                {/if}
+              </button>
+            {/if}
+            <span class="battery" title={client.battery_percent != null ? `${client.battery_mv}mV` : 'Battery data unavailable'}>
+              {client.battery_percent != null ? `${client.battery_percent}%` : '—'}
             </span>
-            <span class="time">{timeAgo(client.last_seen)}</span>
+            <span class="time">{client.last_seen ? timeAgo(client.last_seen) : 'unknown'}</span>
           </div>
           <button
+            class="delete-btn"
+            onclick={() => deleteClient(client.name, client.connected)}
+            disabled={deletePending[client.name]}
+            aria-label="Remove {client.name}"
+            title="Remove client"
+          >{deletePending[client.name] ? '…' : '✕'}</button>
+          <button
             class="ota-btn"
-            onclick={() => triggerOTA(client.mac)}
-            disabled={otaPending[client.mac]}
-            aria-label="OTA {client.mac}"
+            onclick={() => triggerOTA(client.name)}
+            disabled={otaPending[client.name]}
+            aria-label="OTA {client.name}"
             title="Trigger OTA re-flash"
-          >{otaPending[client.mac] ? '…' : 'OTA'}</button>
+          >{otaPending[client.name] ? '…' : 'OTA'}</button>
           <button
             class="sleep-btn"
-            onclick={() => requestSleep(client.mac)}
-            disabled={sleepPending[client.mac] || !client.connected}
+            onclick={() => requestSleep(client.name)}
+            disabled={sleepPending[client.name] || !client.connected}
             aria-label="Sleep {client.mac}"
             title="Send sleep request"
           >{sleepPending[client.mac] ? '…' : 'Sleep'}</button>
-          <button
-            class="delete-btn"
-            onclick={() => deleteClient(client.mac, client.connected)}
-            disabled={deletePending[client.mac]}
-            aria-label="Remove {client.mac}"
-            title="Remove client"
-          >{deletePending[client.mac] ? '…' : '✕'}</button>
           <button
             class="swatch"
             class:active={openMac === client.mac}
@@ -431,13 +511,68 @@
     flex: 1;
   }
 
-  .mac {
+  .name-btn {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    gap: 0;
+  }
+
+  .name-display {
     font-family: monospace;
     font-size: 0.9rem;
+  }
+
+  .name-mac {
+    font-family: monospace;
+    font-size: 0.65rem;
+    color: #444;
+  }
+
+  .name-btn:hover .name-display {
+    text-decoration: underline;
+  }
+
+  li.offline .name-btn { color: #666; }
+  li.offline .name-mac { color: #333; }
+
+  .name-input {
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid #4caf82;
+    border-radius: 3px;
+    background: #1a1a1a;
+    color: inherit;
     flex-shrink: 0;
   }
 
-  li.offline .mac { color: #666; }
+  .name-save-btn, .name-cancel-btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    border: 1px solid #4caf82;
+    border-radius: 3px;
+    background: #1e2410;
+    color: #4caf82;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .name-save-btn:hover:not(:disabled) {
+    background: #2a3418;
+  }
+
+  .name-cancel-btn:hover {
+    background: #2a1818;
+    border-color: #8844aa;
+    color: #cc88ff;
+  }
 
   .time {
     font-size: 0.8rem;
