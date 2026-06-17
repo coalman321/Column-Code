@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 router = APIRouter(prefix="/firmware")
 
 FIRMWARE_BIN = Path(__file__).parent.parent / "firmware" / "app.bin"
+FIRMWARE_VERSION = "1.0.0"  # Must match firmware/main/version.h
 
 _APP_DESC_MAGIC = struct.pack("<I", 0xABCD5432)
 
@@ -61,3 +62,9 @@ def firmware_bin():
         media_type="application/octet-stream",
         filename="app.bin",
     )
+
+
+@router.get("/version")
+def firmware_version():
+    """Get the current firmware version."""
+    return {"version": FIRMWARE_VERSION}

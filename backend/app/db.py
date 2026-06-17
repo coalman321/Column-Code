@@ -72,6 +72,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE clients ADD COLUMN display_name TEXT")
         if not _column_exists(conn, "clients", "hue_offset"):
             conn.execute("ALTER TABLE clients ADD COLUMN hue_offset REAL DEFAULT 0")
+        if not _column_exists(conn, "clients", "firmware_version"):
+            conn.execute("ALTER TABLE clients ADD COLUMN firmware_version TEXT")
 
         conn.commit()
     finally:
@@ -151,6 +153,32 @@ def get_hue_offset(mac: str) -> float:
             (mac,),
         ).fetchone()
         return float(row["hue_offset"]) if row and row["hue_offset"] is not None else 0.0
+    finally:
+        conn.close()
+
+
+def save_firmware_version(mac: str, version: str) -> None:
+    """Save the firmware version for a device."""
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE clients SET firmware_version = ? WHERE mac = ?",
+            (version, mac),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_firmware_version(mac: str) -> str | None:
+    """Get the firmware version for a device."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT firmware_version FROM clients WHERE mac = ?",
+            (mac,),
+        ).fetchone()
+        return row["firmware_version"] if row else None
     finally:
         conn.close()
 

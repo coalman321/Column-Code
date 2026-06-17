@@ -13,6 +13,7 @@
 #include "device_mqtt.h"
 #include "color.h"
 #include "battery.h"
+#include "version.h"
 
 static const char *TAG = "heartbeat";
 
@@ -82,6 +83,8 @@ static void heartbeat_task(void *arg)
             cJSON_AddNumberToObject(root, "battery_percent", batt.soc);
             cJSON_AddNumberToObject(root, "battery_mv", batt.voltage_mv);
         }
+
+        cJSON_AddStringToObject(root, "firmware_version", FIRMWARE_VERSION);
 
         char *json_str = cJSON_PrintUnformatted(root);
         device_mqtt_publish(s_heartbeat_topic, json_str, 1, 0);

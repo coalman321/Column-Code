@@ -12,17 +12,19 @@
     battery_percent?: number | null;
     battery_mv?: number | null;
     color?: RGBWColor;
+    firmware_version?: string | null;
   }
 
   let { presets = $bindable<any[]>([]), currentColor = $bindable<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 }) } = $props();
 
-  let clients     = $state<Client[]>([]);
-  let loading     = $state(false);
-  let error       = $state<string | null>(null);
-  let autoRefresh = $state(true);
-  let colors      = $state<Record<string, RGBWColor>>({});
-  let openMac      = $state<string | null>(null);
-  let popoverStyle = $state('');
+  let clients              = $state<Client[]>([]);
+  let loading              = $state(false);
+  let error                = $state<string | null>(null);
+  let autoRefresh          = $state(true);
+  let colors               = $state<Record<string, RGBWColor>>({});
+  let openMac              = $state<string | null>(null);
+  let popoverStyle         = $state('');
+  let currentFirmwareVersion = $state<string | null>(null);
   let listEl       = $state<HTMLElement | null>(null);
 
   const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -69,11 +71,22 @@
           client.last_seen = data.last_seen;
           client.battery_percent = data.battery_percent;
           client.battery_mv = data.battery_mv;
+          client.firmware_version = data.firmware_version;
           if (data.color) {
             colors[data.mac] = data.color;
           }
           clients = [...clients];
         }
+      }
+    } catch {}
+  }
+
+  async function fetchCurrentFirmwareVersion() {
+    try {
+      const res = await fetch('/firmware/version');
+      if (res.ok) {
+        const data = await res.json();
+        currentFirmwareVersion = data.version;
       }
     } catch {}
   }
@@ -247,6 +260,7 @@
 
   onMount(() => {
     fetchClients();
+    fetchCurrentFirmwareVersion();
     const id = setInterval(() => { if (autoRefresh) fetchClients(); }, 5000);
     return () => clearInterval(id);
   });
@@ -350,8 +364,27 @@
             <span class="battery" title={client.battery_percent != null ? `${client.battery_mv}mV` : 'Battery data unavailable'}>
               {client.battery_percent != null ? `${client.battery_percent}%` : '—'}
             </span>
+            {#if client.firmware_version}
+            <span
+                class="firmware-version"
+                class:needs-update={currentFirmwareVersion && client.firmware_version !== currentFirmwareVersion}
+                title={currentFirmwareVersion && client.firmware_version !== currentFirmwareVersion ? `Update available: ${currentFirmwareVersion}` : `v${client.firmware_version}`}
+              >
+                v{client.firmware_version}
+                {#if currentFirmwareVersion && client.firmware_version !== currentFirmwareVersion}
+                <span class="update-badge">⚠</span>
+                {/if}
+              </span>
+              {:else}
+              <span
+                class="firmware-version firmware-unknown"
+                title="Firmware version not reported"
+              >
+                v?
+              </span>
+              {/if}
             <span class="time">{client.last_seen ? timeAgo(client.last_seen) : 'unknown'}</span>
-          </div>
+            </div>
           <button
             class="delete-btn"
             onclick={() => deleteClient(client.name, client.connected)}
@@ -611,6 +644,33 @@
     background: rgba(76, 175, 130, 0.1);
     border-radius: 3px;
     flex-shrink: 0;
+  }
+
+  .firmware-version {
+    font-size: 0.7rem;
+    color: #7c9cff;
+    white-space: nowrap;
+    padding: 0.2rem 0.4rem;
+    background: rgba(124, 156, 255, 0.1);
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .firmware-version.needs-update {
+    color: #ffaa4a;
+    background: rgba(255, 170, 74, 0.1);
+  }
+
+  .firmware-version.firmware-unknown {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.1);
+  }
+
+  .update-badge {
+    font-size: 0.65rem;
   }
 
   /* ── sleep button ── */

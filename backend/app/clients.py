@@ -21,15 +21,17 @@ def load_from_db() -> None:
 def on_mqtt_heartbeat(mac: str, data: str = "") -> None:
     now = datetime.now(timezone.utc)
     _clients[mac] = now
-    from app.db import save_client, save_battery_status
+    from app.db import save_client, save_battery_status, save_firmware_version
     save_client(mac, now)
 
-    # Parse battery data if present in heartbeat
+    # Parse battery data and firmware version from heartbeat
     if data:
         try:
             payload = json.loads(data)
             if "battery_percent" in payload and "battery_mv" in payload:
                 save_battery_status(mac, payload["battery_percent"], payload["battery_mv"])
+            if "firmware_version" in payload:
+                save_firmware_version(mac, payload["firmware_version"])
         except Exception:
             pass
 
@@ -155,7 +157,7 @@ def _find_mac_by_name(name: str) -> str | None:
 @router.get("/{name}")
 def get_device_info(name: str):
     """Get full device info by display_name or MAC."""
-    from app.db import get_display_name, load_battery_status
+    from app.db import get_display_name, load_battery_status, get_firmware_version
     from app.colors import get_color
 
     mac = _find_mac_by_name(name)
@@ -166,6 +168,7 @@ def get_device_info(name: str):
     ts = _clients[mac]
     batt = load_battery_status(mac)
     color = get_color(mac)
+    fw_version = get_firmware_version(mac)
 
     return {
         "mac": mac,
@@ -175,4 +178,5 @@ def get_device_info(name: str):
         "battery_percent": batt["battery_percent"] if batt else None,
         "battery_mv": batt["battery_mv"] if batt else None,
         "color": color,
+        "firmware_version": fw_version,
     }

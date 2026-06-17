@@ -44,7 +44,8 @@
       "Bash(python3 -m py_compile backend/app/presets.py)",
       "Bash(python3 -m py_compile backend/app/cycle.py backend/app/main.py)",
       "Bash(python3 -m py_compile backend/app/cycle.py backend/app/db.py)",
-      "Bash(python3 -m py_compile backend/app/cycle.py)"
+      "Bash(python3 -m py_compile backend/app/cycle.py)",
+      "Bash(python3 -m py_compile backend/app/db.py backend/app/clients.py backend/app/firmware.py)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"
