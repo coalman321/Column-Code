@@ -10,6 +10,7 @@ from app.clients import router as clients_router
 from app.colors import router as colors_router
 from app.firmware import router as firmware_router
 from app.logs import router as logs_router
+from app.presets import router as presets_router
 import app.mqtt as mqtt_manager
 
 
@@ -18,9 +19,11 @@ async def lifespan(app: FastAPI):
     from app.db import init_db
     from app.colors import load_from_db as load_colors
     from app.clients import load_from_db as load_clients
+    from app.presets import load_from_db as load_presets
     init_db()
     load_colors()
     load_clients()
+    load_presets()
     task = asyncio.create_task(mqtt_manager.run())
     yield
     task.cancel()
@@ -33,6 +36,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(clients_router)
 app.include_router(colors_router)
+app.include_router(presets_router)
 app.include_router(firmware_router)
 app.include_router(logs_router)
 

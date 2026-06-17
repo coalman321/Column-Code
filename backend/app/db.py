@@ -33,6 +33,16 @@ def init_db() -> None:
                 last_seen TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS presets (
+                id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT    NOT NULL UNIQUE,
+                r    INTEGER NOT NULL,
+                g    INTEGER NOT NULL,
+                b    INTEGER NOT NULL,
+                w    INTEGER NOT NULL
+            )
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -109,6 +119,37 @@ def save_color(mac: str, r: int, g: int, b: int, w: int) -> None:
             """,
             (mac, r, g, b, w, now),
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_all_presets() -> list[dict]:
+    conn = _connect()
+    try:
+        rows = conn.execute("SELECT id, name, r, g, b, w FROM presets ORDER BY name").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def save_preset(name: str, r: int, g: int, b: int, w: int) -> int:
+    conn = _connect()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO presets (name, r, g, b, w) VALUES (?, ?, ?, ?, ?)",
+            (name, r, g, b, w),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def delete_preset(preset_id: int) -> None:
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM presets WHERE id = ?", (preset_id,))
         conn.commit()
     finally:
         conn.close()

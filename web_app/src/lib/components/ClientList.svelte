@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ColorPicker from './ColorPicker.svelte';
+  import PresetManager from './PresetManager.svelte';
   import type { RGBWColor } from './ColorPicker.svelte';
 
   interface Client {
@@ -26,6 +27,9 @@
   let openAll         = $state(false);
   let allSwatchEl     = $state<HTMLElement | null>(null);
   let allPopoverStyle = $state('');
+  let presets       = $state<any[]>([]);
+  let showPresetsSection = $state(true);
+  let presetManager = $state<any>(null);
 
   async function fetchClients() {
     loading = true;
@@ -157,6 +161,10 @@
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     return `${Math.floor(diff / 3600)}h ago`;
   }
+
+  function applyPreset(preset: any) {
+    putAllColor({ r: preset.r, g: preset.g, b: preset.b, w: preset.w });
+  }
 </script>
 
 <svelte:window onclick={() => { openMac = null; openAll = false; }} />
@@ -201,6 +209,26 @@
   {#if error}
     <p class="error">{error}</p>
   {/if}
+
+  <div class="presets-section">
+    <button
+      class="section-toggle"
+      onclick={() => (showPresetsSection = !showPresetsSection)}
+      aria-label="Toggle presets section"
+    >
+      {showPresetsSection ? '▼' : '▶'} Presets
+    </button>
+    {#if showPresetsSection}
+      <div class="presets-content">
+        <PresetManager
+          bind:this={presetManager}
+          bind:presets
+          currentColor={allColor}
+          onPresetSelected={applyPreset}
+        />
+      </div>
+    {/if}
+  </div>
 
   {#if clients.length === 0 && !loading}
     <p class="empty">No clients have connected yet.</p>
@@ -485,4 +513,40 @@
     font-size: 0.85rem;
     margin: 0;
   }
+
+  /* ── presets section ── */
+  .presets-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 6px;
+    padding: 0.75rem;
+  }
+
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: left;
+  }
+
+  .section-toggle:hover {
+    color: #ccc;
+  }
+
+  .presets-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
 </style>
