@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ColorPicker from './ColorPicker.svelte';
-  import PresetManager from './PresetManager.svelte';
   import type { RGBWColor } from './ColorPicker.svelte';
 
   interface Client {
@@ -9,6 +8,8 @@
     last_seen: string;
     connected: boolean;
   }
+
+  let { presets = $bindable<any[]>([]), currentColor = $bindable<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 }) } = $props();
 
   let clients     = $state<Client[]>([]);
   let loading     = $state(false);
@@ -23,13 +24,10 @@
   let sleepPending    = $state<Record<string, boolean>>({});
   let deletePending   = $state<Record<string, boolean>>({});
   let sleepAllPending = $state(false);
-  let allColor        = $state<RGBWColor>({ r: 0, g: 0, b: 0, w: 0 });
   let openAll         = $state(false);
   let allSwatchEl     = $state<HTMLElement | null>(null);
   let allPopoverStyle = $state('');
-  let presets       = $state<any[]>([]);
-  let showPresetsSection = $state(true);
-  let presetManager = $state<any>(null);
+  let presetOpen      = $state<string | null>(null);
 
   async function fetchClients() {
     loading = true;
@@ -110,10 +108,21 @@
   }
 
   function putAllColor(color: RGBWColor) {
+    currentColor = color;
     for (const c of clients) {
       colors[c.mac] = color;
       putColor(c.mac, color);
     }
+  }
+
+  function applyPresetToAll(preset: any) {
+    putAllColor({ r: preset.r, g: preset.g, b: preset.b, w: preset.w });
+  }
+
+  function applyPresetToDevice(mac: string, preset: any) {
+    const color = { r: preset.r, g: preset.g, b: preset.b, w: preset.w };
+    colors[mac] = color;
+    putColor(mac, color);
   }
 
   function openAllPicker(e: MouseEvent) {
@@ -162,9 +171,6 @@
     return `${Math.floor(diff / 3600)}h ago`;
   }
 
-  function applyPreset(preset: any) {
-    putAllColor({ r: preset.r, g: preset.g, b: preset.b, w: preset.w });
-  }
 </script>
 
 <svelte:window onclick={() => { openMac = null; openAll = false; }} />
@@ -198,7 +204,7 @@
         bind:this={allSwatchEl}
         class="swatch"
         class:active={openAll}
-        style={`--bg: ${swatchBg(allColor)}`}
+        style={`--bg: ${swatchBg(currentColor as RGBWColor)}`}
         onclick={openAllPicker}
         title="Set color on all clients"
         aria-label="Set color on all clients"
@@ -209,26 +215,6 @@
   {#if error}
     <p class="error">{error}</p>
   {/if}
-
-  <div class="presets-section">
-    <button
-      class="section-toggle"
-      onclick={() => (showPresetsSection = !showPresetsSection)}
-      aria-label="Toggle presets section"
-    >
-      {showPresetsSection ? '▼' : '▶'} Presets
-    </button>
-    {#if showPresetsSection}
-      <div class="presets-content">
-        <PresetManager
-          bind:this={presetManager}
-          bind:presets
-          currentColor={allColor}
-          onPresetSelected={applyPreset}
-        />
-      </div>
-    {/if}
-  </div>
 
   {#if clients.length === 0 && !loading}
     <p class="empty">No clients have connected yet.</p>
@@ -274,7 +260,7 @@
       aria-label="Set color on all clients"
     >
       <ColorPicker
-        bind:value={allColor}
+        bind:value={currentColor as RGBWColor}
         onchange={(c) => putAllColor(c)}
       />
     </div>
@@ -512,41 +498,6 @@
     color: #f55;
     font-size: 0.85rem;
     margin: 0;
-  }
-
-  /* ── presets section ── */
-  .presets-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    background: #0a0a0a;
-    border: 1px solid #1a1a1a;
-    border-radius: 6px;
-    padding: 0.75rem;
-  }
-
-  .section-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: #999;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 500;
-    text-align: left;
-  }
-
-  .section-toggle:hover {
-    color: #ccc;
-  }
-
-  .presets-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
   }
 
 </style>
