@@ -17,8 +17,8 @@ static const char *TAG = "color";
 
 #define SK6812_T0H  3
 #define SK6812_T0L  9
-#define SK6812_T1H  6
-#define SK6812_T1L  6
+#define SK6812_T1H  7
+#define SK6812_T1L  4
 #define SK6812_RESET_US  100
 
 static rmt_channel_handle_t s_led_chan    = NULL;
