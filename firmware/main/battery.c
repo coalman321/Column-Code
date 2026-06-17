@@ -2,6 +2,10 @@
 
 #include "esp_log.h"
 #include "driver/i2c_master.h"
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "battery";
 
@@ -14,6 +18,28 @@ static i2c_master_dev_handle_t s_max17048_handle = NULL;
 
 esp_err_t battery_init(void)
 {
+    /* Enable I2C power pin for STEMMA QT connector (GPIO 20 on Adafruit Feather ESP32-C6) */
+    #ifdef CONFIG_I2C_POWER_GPIO
+    const int i2c_power_gpio = CONFIG_I2C_POWER_GPIO;
+    if (i2c_power_gpio >= 0) {
+        gpio_config_t io_conf = {
+            .intr_type = GPIO_INTR_DISABLE,
+            .mode = GPIO_MODE_OUTPUT,
+            .pin_bit_mask = (1ULL << i2c_power_gpio),
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+        };
+        esp_err_t err = gpio_config(&io_conf);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "failed to configure I2C power pin: %s", esp_err_to_name(err));
+            return err;
+        }
+        gpio_set_level(i2c_power_gpio, 1);
+        ESP_LOGI(TAG, "I2C power pin (GPIO %d) enabled", i2c_power_gpio);
+        vTaskDelay(pdMS_TO_TICKS(100));  /* Wait for power to stabilize */
+    }
+    #endif
+
     /* Configure I2C bus */
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
