@@ -218,7 +218,11 @@ def load_global_color() -> dict | None:
         if not row:
             return None
         import json
-        return json.loads(row["value"])
+        color = json.loads(row["value"])
+        # Ensure flicker field exists (for backwards compatibility)
+        if "flicker" not in color:
+            color["flicker"] = False
+        return color
     finally:
         conn.close()
 

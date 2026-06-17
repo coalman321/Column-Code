@@ -30,6 +30,7 @@
   let deletePending   = $state<Record<string, boolean>>({});
   let sleepAllPending = $state(false);
   let otaPending      = $state<Record<string, boolean>>({});
+  let blinkPending    = $state<Record<string, boolean>>({});
   let openAll         = $state(false);
   let allSwatchEl     = $state<HTMLElement | null>(null);
   let allPopoverStyle = $state('');
@@ -146,6 +147,20 @@
       console.error('OTA trigger failed:', e);
     } finally {
       otaPending[name] = false;
+    }
+  }
+
+  async function triggerBlink(name: string) {
+    const client = clients.find(c => c.name === name);
+    if (!client?.mac) return;
+    blinkPending[name] = true;
+    try {
+      const res = await fetch(`/clients/blink/${client.mac}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error('Blink trigger failed:', e);
+    } finally {
+      blinkPending[name] = false;
     }
   }
 
@@ -352,12 +367,19 @@
             title="Trigger OTA re-flash"
           >{otaPending[client.name] ? '…' : 'OTA'}</button>
           <button
+            class="blink-btn"
+            onclick={() => triggerBlink(client.name)}
+            disabled={blinkPending[client.name] || !client.connected}
+            aria-label="Blink {client.name}"
+            title="Flash green for 5 seconds"
+          >{blinkPending[client.name] ? '…' : '💡'}</button>
+          <button
             class="sleep-btn"
             onclick={() => requestSleep(client.name)}
             disabled={sleepPending[client.name] || !client.connected}
-            aria-label="Sleep {client.mac}"
+            aria-label="Sleep {client.name}"
             title="Send sleep request"
-          >{sleepPending[client.mac] ? '…' : 'Sleep'}</button>
+          >{sleepPending[client.name] ? '…' : 'Sleep'}</button>
           <button
             class="swatch"
             class:active={openMac === client.mac}
@@ -613,6 +635,25 @@
   .ota-btn:disabled { opacity: 0.35; cursor: default; }
 
   /* ── sleep button ── */
+  .blink-btn {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    border: 1px solid #3a3a2a;
+    border-radius: 4px;
+    background: #1e2410;
+    color: #88cc44;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .blink-btn:hover:not(:disabled) {
+    background: #2a3418;
+    border-color: #66aa44;
+    color: #aaee66;
+  }
+
+  .blink-btn:disabled { opacity: 0.35; cursor: default; }
+
   .sleep-btn {
     padding: 0.2rem 0.55rem;
     font-size: 0.75rem;
@@ -634,7 +675,7 @@
 
   /* ── delete button ── */
   .delete-btn {
-    padding: 0.2rem 0.45rem;
+    padding: 0.2rem 0.55rem;
     font-size: 0.75rem;
     border: 1px solid #3a2a2a;
     border-radius: 4px;

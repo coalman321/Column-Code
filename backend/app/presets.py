@@ -18,6 +18,7 @@ def load_from_db() -> None:
             "g": row["g"],
             "b": row["b"],
             "w": row["w"],
+            "flicker": bool(row["flicker"]),
         }
 
 

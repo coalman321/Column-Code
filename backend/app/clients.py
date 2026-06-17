@@ -87,6 +87,16 @@ def set_display_name(mac: str, body: dict):
     return {"mac": mac, "display_name": name}
 
 
+@router.post("/blink/{mac}", status_code=204)
+async def request_blink(mac: str) -> None:
+    """Send a blink request to a device (rapid green flash for 5 seconds)."""
+    mac = mac.upper()
+    if mac not in _clients:
+        raise HTTPException(status_code=404, detail="Unknown client")
+    from app.mqtt import publish
+    await publish(f"devices/{mac}/cmd", {"blink": True})
+
+
 @router.post("/sleep/{mac}", status_code=204)
 async def request_sleep(mac: str) -> None:
     mac = mac.upper()

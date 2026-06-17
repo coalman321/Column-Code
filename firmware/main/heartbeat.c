@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "esp_log.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -18,6 +19,7 @@ static const char *TAG = "heartbeat";
 static char s_heartbeat_topic[64];   /* "devices/{mac}/heartbeat" */
 static char s_cmd_topic[64];          /* "devices/{mac}/cmd"       */
 static volatile bool s_sleep_requested = false;
+static volatile bool s_blink_requested = false;
 
 static void configure_wakeup_gpio(void)
 {
@@ -53,11 +55,19 @@ static void on_cmd_message(const char *topic, int topic_len,
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) return;
-    cJSON *js = cJSON_GetObjectItem(root, "sleep");
-    if (cJSON_IsTrue(js)) {
+
+    cJSON *js_sleep = cJSON_GetObjectItem(root, "sleep");
+    if (cJSON_IsTrue(js_sleep)) {
         s_sleep_requested = true;
         ESP_LOGI(TAG, "server requested sleep via MQTT");
     }
+
+    cJSON *js_blink = cJSON_GetObjectItem(root, "blink");
+    if (cJSON_IsTrue(js_blink)) {
+        s_blink_requested = true;
+        ESP_LOGI(TAG, "server requested blink via MQTT");
+    }
+
     cJSON_Delete(root);
 }
 
@@ -77,6 +87,19 @@ static void heartbeat_task(void *arg)
         device_mqtt_publish(s_heartbeat_topic, json_str, 1, 0);
         free(json_str);
         cJSON_Delete(root);
+
+        if (s_blink_requested) {
+            s_blink_requested = false;
+            ESP_LOGI(TAG, "blinking green for 5 seconds");
+            uint32_t blink_end = esp_timer_get_time() / 1000 + 5000;  /* 5 seconds from now */
+            while (esp_timer_get_time() / 1000 < blink_end) {
+                color_apply(0, 255, 0, 0, false);  /* Green ON */
+                vTaskDelay(pdMS_TO_TICKS(100));
+                color_apply(0, 0, 0, 0, false);    /* OFF */
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            color_apply(0, 0, 0, 0, false);  /* Ensure OFF at end */
+        }
 
         if (s_sleep_requested) {
             s_sleep_requested = false;

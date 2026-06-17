@@ -10,6 +10,7 @@
     g: number;
     b: number;
     w: number;
+    flicker?: boolean;
   }
 
   interface Props {
@@ -165,7 +166,12 @@
             }}
           >
             <div class="tile-content">
-              <div class="tile-name">{preset.name}</div>
+              <div class="tile-name-wrapper">
+                <div class="tile-name">{preset.name}</div>
+                {#if preset.flicker}
+                  <span class="flicker-badge" title="Candlelight flicker enabled">🕯️</span>
+                {/if}
+              </div>
               <button
                 class="tile-delete"
                 onclick={(e) => {
@@ -320,6 +326,15 @@
     height: 100%;
   }
 
+  .tile-name-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    flex: 1;
+  }
+
   .tile-name {
     font-size: 0.7rem;
     color: #ccc;
@@ -327,10 +342,6 @@
     word-break: break-word;
     line-height: 1.2;
     max-width: 100%;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .tile-delete {
@@ -376,5 +387,10 @@
     color: #f55;
     margin: 0;
     padding: 0.5rem;
+  }
+
+  .flicker-badge {
+    font-size: 0.8rem;
+    display: inline-block;
   }
 </style>

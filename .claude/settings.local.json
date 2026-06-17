@@ -40,7 +40,8 @@
       "Bash(python3)",
       "Bash(find /home/coalman321 -name \"column.db\" -type f 2>/dev/null)",
       "Read(//home/coalman321/**)",
-      "Bash(curl -s -v http://localhost:8000/clients/)"
+      "Bash(curl -s -v http://localhost:8000/clients/)",
+      "Bash(python3 -m py_compile backend/app/presets.py)"
     ],
     "additionalDirectories": [
       "/home/coalman321/column-project/firmware"
