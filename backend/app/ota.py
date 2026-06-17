@@ -8,12 +8,12 @@ async def trigger_ota(mac: str):
     """Trigger OTA update on a device via MQTT."""
     mac = mac.upper()
 
-    from app.mqtt import mqtt_manager
+    from app.mqtt import publish
     topic = f"devices/{mac}/ota"
-    payload = '{"trigger": true}'
+    payload = {"trigger": True}
 
     try:
-        await mqtt_manager.publish(topic, payload, qos=1, retain=False)
+        await publish(topic, payload, qos=1, retain=False)
         return {"status": "OTA update triggered", "mac": mac, "topic": topic}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to publish OTA trigger: {str(e)}")

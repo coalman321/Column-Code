@@ -45,6 +45,12 @@ def init_db() -> None:
                 flicker INTEGER NOT NULL DEFAULT 0
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS global_state (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -153,6 +159,34 @@ def delete_preset(preset_id: int) -> None:
     conn = _connect()
     try:
         conn.execute("DELETE FROM presets WHERE id = ?", (preset_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_global_color() -> dict | None:
+    """Load the persisted global color from the database."""
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT value FROM global_state WHERE key = ?", ("current_color",)).fetchone()
+        if not row:
+            return None
+        import json
+        return json.loads(row["value"])
+    finally:
+        conn.close()
+
+
+def save_global_color(r: int, g: int, b: int, w: int, flicker: bool = False) -> None:
+    """Save the global color to the database."""
+    conn = _connect()
+    try:
+        import json
+        value = json.dumps({"r": r, "g": g, "b": b, "w": w, "flicker": flicker})
+        conn.execute(
+            "INSERT INTO global_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("current_color", value),
+        )
         conn.commit()
     finally:
         conn.close()

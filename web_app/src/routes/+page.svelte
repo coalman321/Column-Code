@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import LogViewer from '$lib/components/LogViewer.svelte';
   import ClientList from '$lib/components/ClientList.svelte';
   import PresetManager from '$lib/components/PresetManager.svelte';
@@ -14,6 +15,37 @@
     currentColor = color;
     clientList?.applyPresetToAll(color);
   }
+
+  async function fetchGlobalColor() {
+    try {
+      const res = await fetch('/colors/global/current');
+      if (res.ok) {
+        currentColor = await res.json();
+      }
+    } catch (e) {
+      console.error('Failed to fetch global color:', e);
+    }
+  }
+
+  async function saveGlobalColor(color: RGBWColor) {
+    try {
+      await fetch('/colors/global/current', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(color),
+      });
+    } catch (e) {
+      console.error('Failed to save global color:', e);
+    }
+  }
+
+  onMount(() => {
+    fetchGlobalColor();
+  });
+
+  $effect(() => {
+    saveGlobalColor(currentColor);
+  });
 </script>
 
 <main>

@@ -128,17 +128,20 @@ static void flicker_task(void *arg)
             continue;
         }
 
-        /* Oscillate W channel between 70% and 100% of base value. */
-        float factor = 0.7 + 0.3 * (1.0 + sinf(phase * 0.1f)) / 2.0f;
-        uint8_t w_modulated = (uint8_t)(s_color_w * factor);
+        /* Oscillate brightness between 60% and 100% of base value using sine wave. */
+        float brightness = 0.6 + 0.4 * (1.0 + sinf(phase * 0.1f)) / 2.0f;
+        uint8_t r_modulated = (uint8_t)(s_color_r * brightness);
+        uint8_t g_modulated = (uint8_t)(s_color_g * brightness);
+        uint8_t b_modulated = (uint8_t)(s_color_b * brightness);
+        uint8_t w_modulated = (uint8_t)(s_color_w * brightness);
         phase++;
 
         /* SK6812 wire order is G R B W. */
         uint8_t pixels[CONFIG_COLOR_NUM_LEDS * 4];
         for (int i = 0; i < CONFIG_COLOR_NUM_LEDS; i++) {
-            pixels[i * 4 + 0] = s_color_g;
-            pixels[i * 4 + 1] = s_color_r;
-            pixels[i * 4 + 2] = s_color_b;
+            pixels[i * 4 + 0] = g_modulated;
+            pixels[i * 4 + 1] = r_modulated;
+            pixels[i * 4 + 2] = b_modulated;
             pixels[i * 4 + 3] = w_modulated;
         }
 
